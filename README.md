@@ -1,4 +1,4 @@
-# AETHERA
+# ![AETHERA Logo](docs/assets/AETHERA_logo.png) 
 
 **🌍AETHERA** is an AI-powered platform for conducting fast, accurate, and transparent Environmental Impact Assessments (EIAs). Combining machine learning, geospatial data analysis, and emissions automation, AETHERA is designed to streamline the EIA process for governments, consultancies, infrastructure developers, and researchers.
 
