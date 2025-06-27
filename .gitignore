@@ -1,0 +1,58 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+*.pyo
+*.pyd
+.Python
+
+# === Virtual Environment ===
+venv/
+env/
+ENV/
+.venv/
+
+# === Jupyter Notebooks (if used in the future) ===
+.ipynb_checkpoints/
+
+# === Data and Outputs ===
+data/
+outputs/
+*.csv
+*.xlsx
+*.pdf
+*.geojson
+*.shp
+*.shx
+*.dbf
+*.prj
+*.gpkg
+*.zip
+*.tif
+*.gdb
+
+# === Logs ===
+*.log
+
+# === VSCode and other IDEs ===
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# === OS/System Files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Reports ===
+*.pdf
+*.docx
+
+# === Test Results ===
+htmlcov/
+.coverage
+.tox/
+.nox/
+pytest_cache/
