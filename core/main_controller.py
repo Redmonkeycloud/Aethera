@@ -7,129 +7,149 @@ import geopandas as gpd
 from core import gis_handler
 from core import aoi_landcover_analysis
 
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
 def ensure_directories():
     """Create necessary base folders if missing."""
-    base_folders = [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"),
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
-    ]
-    for folder in base_folders:
-        os.makedirs(folder, exist_ok=True)
+    for folder in ["data", "outputs"]:
+        os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
     print("[INIT] Folder structure ensured.")
 
-def ensure_base_datasets():
-    """Check and download datasets if missing."""
+def ensure_base_datasets(country_code):
+    """Check and download required base datasets if missing."""
     print("[INIT] Checking base datasets...")
-    
-    natural_earth_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "natural_earth")
-    gadm_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "gadm")
-    eurostat_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "eurostat")
-    corine_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "corine")
 
-    if not os.path.exists(natural_earth_path) or len(os.listdir(natural_earth_path)) == 0:
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+    DATA_DIR = os.path.join(BASE_DIR, "data")
+    NATURAL_EARTH_DIR = os.path.join(DATA_DIR, "natural_earth")
+    GADM_DIR = os.path.join(DATA_DIR, "gadm")
+    EUROSTAT_DIR = os.path.join(DATA_DIR, "eurostat")
+    CORINE_DIR = os.path.join(DATA_DIR, "corine")
+
+    # Ensure data directories exist
+    for folder in [NATURAL_EARTH_DIR, GADM_DIR, EUROSTAT_DIR, CORINE_DIR]:
+        os.makedirs(folder, exist_ok=True)
+
+    # Check and download Natural Earth
+    if not os.listdir(NATURAL_EARTH_DIR):
         gis_handler.download_natural_earth()
 
-    if not os.path.exists(gadm_path) or len(os.listdir(gadm_path)) == 0:
-        gis_handler.download_gadm()
+    # Check and download GADM
+    gadm_file_path = os.path.join(GADM_DIR, f"gadm41_{country_code}_0.shp")
+    if not os.path.exists(gadm_file_path):
+        gis_handler.download_gadm(country_code)
 
-    if not os.path.exists(eurostat_path) or len(os.listdir(eurostat_path)) == 0:
+    # Check and download Eurostat
+    if not os.listdir(EUROSTAT_DIR):
         gis_handler.download_eurostat()
 
-    # CORINE vector is downloaded manually for now
-    if not os.path.exists(corine_path):
-        os.makedirs(corine_path)
-        print("[CORINE] Please manually download and place the CORINE GPKG into /data/corine/")
+    # CORINE (manual)
+    if not os.path.exists(CORINE_DIR):
+        os.makedirs(CORINE_DIR)
+        print("[CORINE] Please manually place the CORINE GPKG into /data/corine/")
+    else:
+        gpkg_found = any(f.endswith(".gpkg") for f in os.listdir(CORINE_DIR))
+        if not gpkg_found:
+            print("[CORINE] Please manually place the CORINE GPKG into /data/corine/")
 
     print("[INIT] All base datasets ready.")
 
 def load_country_aoi(country_code):
-    """Load AOI geometry from GADM for a given ISO country code."""
-    gadm_shapefile = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "gadm", "gadm41_0.shp")
-    if not os.path.exists(gadm_shapefile):
-        raise FileNotFoundError("GADM shapefile not found. Please ensure it is downloaded.")
+    """Load country geometry from GADM."""
+    gadm_path = os.path.join(BASE_DIR, "data", "gadm", f"gadm41_{country_code}_shp", f"gadm41_{country_code}_0.shp")
+    if not os.path.exists(gadm_path):
+        raise FileNotFoundError(f"GADM shapefile not found: {gadm_path}")
 
-    gadm = gpd.read_file(gadm_shapefile)
+    gadm = gpd.read_file(gadm_path)
+    print(f"[DEBUG] GADM columns: {gadm.columns.tolist()}")
+
     if "GID_0" not in gadm.columns:
-        raise ValueError("GADM shapefile missing 'GID_0' country code column.")
+        raise ValueError("Expected 'GID_0' column not found in GADM file.")
 
-    aoi_gdf = gadm[gadm["GID_0"] == country_code.upper()]
+    aoi_gdf = gadm[gadm["GID_0"] == country_code]
     if aoi_gdf.empty:
-        raise ValueError(f"Country code '{country_code}' not found in GADM data.")
+        raise ValueError(f"Country code {country_code} not found in GADM data.")
 
-    print(f"[AOI] Selected country: {country_code} - {aoi_gdf.iloc[0]['NAME_0']}")
+    name_col = "COUNTRY" if "COUNTRY" in aoi_gdf.columns else "NAME_0" if "NAME_0" in aoi_gdf.columns else "Unknown"
+    print(f"[AOI] Selected country: {country_code} - {aoi_gdf.iloc[0].get(name_col, 'Unknown')}")
     return aoi_gdf
 
 def ensure_country_corine_layer(country_code, aoi_gdf):
-    """Ensure a country-specific CORINE shapefile exists; extract if needed."""
-    country_shapefile = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "data", "corine",
-        f"corine_{country_code}.shp"
-    )
+    """
+    Ensure a country-specific CORINE shapefile exists; extract if needed.
+    Clips the full CORINE GPKG to the country's AOI and saves a smaller file.
+    """
+    BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+    corine_dir = os.path.join(BASE_DIR, "data", "corine")
+    corine_layer_name = "U2018_CLC2018_V2020_20u1"
+    gpkg_path = os.path.join(corine_dir, f"{corine_layer_name}.gpkg")
+
+    # Output path for the clipped version
+    country_shapefile = os.path.join(corine_dir, f"corine_{country_code}.shp")
 
     if os.path.exists(country_shapefile):
         print(f"[CORINE] Country CORINE shapefile already exists: {country_shapefile}")
         return country_shapefile
 
-    print(f"[CORINE] Extracting {country_code} from full GPKG...")
-    gpkg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "corine", "u2018_clc2018_v2020_20u1_geoPackage.gpkg")
-    
     if not os.path.exists(gpkg_path):
-        raise FileNotFoundError(f"GPKG file not found: {gpkg_path}")
+        raise FileNotFoundError(f"[ERROR] GPKG file not found: {gpkg_path}")
 
-    # Load full GPKG (large file)
-    full_gdf = gpd.read_file(gpkg_path)
+    print(f"[CORINE] Extracting {country_code} from full GPKG...")
+    print("[INFO] Using pyogrio for efficient spatial read...")
 
-    # Reproject AOI to match CORINE CRS if necessary
+    # Ensure CRS match
+    bbox = aoi_gdf.to_crs("EPSG:3035").total_bounds  # CORINE usually in EPSG:3035
+
+    # Load only features within AOI bbox
+    try:
+        full_gdf = gpd.read_file(gpkg_path, layer=corine_layer_name, bbox=tuple(bbox))
+    except Exception as e:
+        raise RuntimeError(f"[ERROR] Failed to load CORINE layer: {e}")
+
+    if full_gdf.empty:
+        raise ValueError(f"[ERROR] No CORINE data found in bounding box for {country_code}.")
+
+    # Reproject AOI to match CORINE layer
     if full_gdf.crs != aoi_gdf.crs:
         aoi_gdf = aoi_gdf.to_crs(full_gdf.crs)
 
-    # Clip CORINE to AOI
-    clipped_gdf = gpd.overlay(full_gdf, aoi_gdf, how="intersection")
+    # Clip precisely
+    clipped = gpd.overlay(full_gdf, aoi_gdf, how="intersection")
 
-    if clipped_gdf.empty:
-        raise ValueError(f"No CORINE land cover found for country {country_code}.")
+    if clipped.empty:
+        raise ValueError(f"[ERROR] No CORINE features intersect with AOI for {country_code}.")
 
-    # Save country-specific CORINE shapefile
-    clipped_gdf.to_file(country_shapefile)
-    print(f"[CORINE] Saved extracted CORINE shapefile: {country_shapefile}")
+    # Save clipped shapefile
+    clipped.to_file(country_shapefile)
+    print(f"[CORINE] Saved clipped CORINE data to: {country_shapefile}")
 
     return country_shapefile
 
 def run_aoi_analysis(country_code):
-    """Run the full AOI land cover and emissions analysis."""
-    print(f"[RUN] Running full analysis for {country_code}...")
-
-    # Load AOI
+    """Run the full analysis pipeline for a country."""
     aoi_gdf = load_country_aoi(country_code)
+    corine_path = ensure_country_corine_layer(country_code, aoi_gdf)
 
-    # Ensure extracted country-specific CORINE layer
-    country_corine_shapefile = ensure_country_corine_layer(country_code, aoi_gdf)
-
-    # Run full land cover + emissions analysis
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
-        aoi_gdf, country_code, country_corine_shapefile
+        aoi_gdf, country_code, corine_path
     )
 
-    # Save results to Excel
-    output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
-    excel_path = os.path.join(output_dir, f"analysis_summary_{country_code}.xlsx")
-
-    with pd.ExcelWriter(excel_path) as writer:
+    output_xlsx = os.path.join(BASE_DIR, "outputs", f"analysis_summary_{country_code}.xlsx")
+    with pd.ExcelWriter(output_xlsx) as writer:
         landcover_summary.to_excel(writer, sheet_name="Land Cover Summary", index=False)
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
 
-    print(f"[OUTPUT] Results saved to: {excel_path}")
+    print(f"[OUTPUT] Results saved to: {output_xlsx}")
 
 def main():
-    """Main entry point."""
     parser = argparse.ArgumentParser(description="AETHERA: EIA Automated Analysis")
-    parser.add_argument("--country", type=str, required=True, help="ISO3 country code (e.g., GRC, ESP, ITA)")
+    parser.add_argument("--country", type=str, required=True, help="ISO3 country code (e.g., GRC, ITA)")
     args = parser.parse_args()
 
     print("\n--- AETHERA: EIA Automated Analysis ---\n")
     ensure_directories()
-    ensure_base_datasets()
+    ensure_base_datasets(args.country.upper())
     run_aoi_analysis(args.country.upper())
     print("\n--- AETHERA: All processes completed successfully ---\n")
 

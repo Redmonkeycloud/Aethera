@@ -43,7 +43,7 @@ def download_natural_earth(scale="10m", theme="cultural"):
     save_path = os.path.join(BASE_DATA_DIR, "natural_earth", f"ne_{scale}_admin_0_countries.zip")
     return download_file(base_url, save_path)
 
-def download_gadm(country_code="GRC"):
+def download_gadm(country_code):
     """Download GADM administrative boundaries."""
     ensure_directory(os.path.join(BASE_DATA_DIR, "gadm"))
     base_url = f"https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_{country_code}_shp.zip"
