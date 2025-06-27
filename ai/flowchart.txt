@@ -1,0 +1,28 @@
+ai/
+├── __init__.py
+├── models/
+│   ├── __init__.py
+│   ├── suitability_model.py       # RESM - Renewable Energy Suitability Model
+│   ├── agriculture_model.py       # AHSM - Agricultural and Husbandry Suitability Model
+│   └── climate_impact_model.py    # CIM - Climate Impact Model
+├── data_processing/
+│   ├── __init__.py
+│   ├── preprocessing.py
+│   └── feature_engineering.py
+├── training/
+│   ├── __init__.py
+│   ├── train_resm.py
+│   ├── train_ahsm.py
+│   └── train_cim.py
+├── evaluation/
+│   ├── __init__.py
+│   ├── metrics.py
+│   └── validation.py
+├── utils/
+│   ├── __init__.py
+│   ├── logging_utils.py
+│   └── model_utils.py
+└── config/
+    ├── resm_config.yaml
+    ├── ahsm_config.yaml
+    └── cim_config.yaml
