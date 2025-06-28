@@ -37,6 +37,10 @@ def init_logger(name: str, country_code: str = "GENERIC"):
     logger.info(f"Logger initialized for {country_code}. Logs will be saved to: {log_filename}")
     return logger
 
+def setup_logger(name: str = "AETHERA", country_code: str = "GENERIC"):
+    """Convenience wrapper for logger initialization."""
+    return init_logger(name, country_code)
+
 def log_step(logger, message: str):
     """Logs a general step/info message."""
     logger.info(message)
