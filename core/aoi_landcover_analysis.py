@@ -4,8 +4,6 @@ import os
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
-
-# Import emissions calculator
 from core.emissions_api import estimate_emissions
 
 # Paths

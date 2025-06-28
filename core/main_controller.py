@@ -7,7 +7,6 @@ import time
 import traceback
 import pandas as pd
 import geopandas as gpd
-
 from core import gis_handler, aoi_landcover_analysis
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
 
