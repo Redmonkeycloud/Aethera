@@ -12,15 +12,14 @@ from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_ex
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-logger = setup_logger()
 
-def ensure_directories():
+def ensure_directories(logger):
     """Create necessary base folders if missing."""
     for folder in ["data", "outputs"]:
         os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
     log_step(logger, "[INIT] Folder structure ensured.")
 
-def ensure_base_datasets(country_code):
+def ensure_base_datasets(country_code, logger):
     """Check and download required base datasets if missing."""
     log_step(logger, "[INIT] Checking base datasets...")
 
@@ -50,7 +49,7 @@ def ensure_base_datasets(country_code):
     log_step(logger, "[INIT] All base datasets ready.")
     log_memory_usage(logger, "After base dataset check")
 
-def load_country_aoi(country_code):
+def load_country_aoi(country_code, logger):
     gadm_path = os.path.join(DATA_DIR, "gadm", f"gadm41_{country_code}_shp", f"gadm41_{country_code}_0.shp")
     if not os.path.exists(gadm_path):
         raise FileNotFoundError(f"GADM shapefile not found: {gadm_path}")
@@ -69,7 +68,7 @@ def load_country_aoi(country_code):
     logger.info(f"[AOI] Selected country: {country_code} - {aoi.iloc[0].get(name_col, 'Unknown')}")
     return aoi
 
-def ensure_country_corine_layer(country_code, aoi_gdf):
+def ensure_country_corine_layer(country_code, aoi_gdf, logger):
     corine_dir = os.path.join(DATA_DIR, "corine")
     layer = "U2018_CLC2018_V2020_20u1"
     gpkg_path = os.path.join(corine_dir, f"{layer}.gpkg")
@@ -100,9 +99,9 @@ def ensure_country_corine_layer(country_code, aoi_gdf):
     logger.info(f"[CORINE] Saved to {output_path}")
     return output_path
 
-def run_aoi_analysis(country_code):
-    aoi_gdf = load_country_aoi(country_code)
-    corine_path = ensure_country_corine_layer(country_code, aoi_gdf)
+def run_aoi_analysis(country_code, logger):
+    aoi_gdf = load_country_aoi(country_code, logger)
+    corine_path = ensure_country_corine_layer(country_code, aoi_gdf, logger)
 
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
@@ -118,23 +117,29 @@ def run_aoi_analysis(country_code):
     log_memory_usage(logger, "After full AOI analysis")
 
 def main():
-    start_time = time.time()
     parser = argparse.ArgumentParser(description="AETHERA: EIA Automated Analysis")
     parser.add_argument("--country", type=str, required=True, help="ISO3 country code (e.g., GRC, ITA)")
     args = parser.parse_args()
+    country_code = args.country.upper()
 
-    logger.info("\n--- AETHERA: EIA Automated Analysis ---\n")
+    print("\n--- AETHERA: EIA Automated Analysis ---\n")
+
+    # Initialize logger *after* getting country code
+    logger = setup_logger("AETHERA", country_code)
+
     try:
-        ensure_directories()
-        ensure_base_datasets(args.country.upper())
-        run_aoi_analysis(args.country.upper())
-        logger.info("\n--- AETHERA: All processes completed successfully ---\n")
+        log_step(logger, "Starting folder checks and setup...")
+        ensure_directories(logger)
+        ensure_base_datasets(country_code, logger)
+
+        log_step(logger, f"Running AOI analysis for {country_code}...")
+        run_aoi_analysis(country_code, logger)
+
+        log_step(logger, "All processes completed successfully.")
+        print("\n--- AETHERA: All processes completed successfully ---\n")
     except Exception as e:
-        log_exception(logger, e)
+        log_exception(logger, "Unhandled exception in AETHERA main pipeline", e)
         sys.exit(1)
-    finally:
-        elapsed = time.time() - start_time
-        logger.info(f"[RUNTIME] Total elapsed time: {elapsed:.2f} seconds")
 
 if __name__ == "__main__":
     main()
