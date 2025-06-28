@@ -34,6 +34,7 @@ outputs/
 
 # === Logs ===
 *.log
+logs/
 
 # === VSCode and other IDEs ===
 .vscode/

@@ -48,11 +48,17 @@ def intersect_aoi_with_corine(aoi_gdf, corine_shapefile_path):
         clipped = clipped.to_crs(epsg=3857)  # Project to meters
     clipped["area_ha"] = clipped.geometry.area / 10000  # m² to hectares
 
+    # Normalize column names to lowercase for robustness
+    clipped.columns = [col.lower() for col in clipped.columns]
+
     # Map CORINE land cover codes to labels
-    clipped["land_cover_label"] = clipped["CODE_18"].map(CORINE_CODES).fillna("Unknown")
+    if "code_18" not in clipped.columns:
+        raise KeyError("Expected 'Code_18' or 'CODE_18' column not found in CORINE data.")
+
+    clipped["land_cover_label"] = clipped["code_18"].map(CORINE_CODES).fillna("Unknown")
 
     # Summarize area by land cover label
-    summary = clipped.groupby(["CODE_18", "land_cover_label"])["area_ha"].sum().reset_index()
+    summary = clipped.groupby(["code_18", "land_cover_label"])["area_ha"].sum().reset_index()
     summary.columns = ["corine_code", "land_cover", "area_hectares"]
 
     return clipped, summary
