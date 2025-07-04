@@ -1,4 +1,4 @@
-# core/main_controller.py
+# main_controller.py
 
 import os
 import sys
