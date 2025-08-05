@@ -1,4 +1,4 @@
-# ai/training/train_resm.py
+# train_resm.py
 
 import os
 import sys
@@ -6,7 +6,7 @@ import yaml
 import joblib
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import (root_mean_squared_error, mean_absolute_error, r2_score, explained_variance_score)
 from ai.models.suitability_model import RESMModel
 from utils.logging_utils import setup_logger, log_step, log_exception
 
@@ -36,7 +36,9 @@ try:
     # --- Split data ---
     test_size = config['training']['test_size']
     random_state = config['training'].get('random_state', 42)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state
+    )
 
     log_step(logger, f"Split data: train={X_train.shape[0]} rows, test={X_test.shape[0]} rows")
 
@@ -47,12 +49,16 @@ try:
 
     log_step(logger, "Model training completed.")
 
-    # --- Evaluate ---
+    # --- Evaluate on test set ---
     predictions = model.predict(X_test)
-    rmse = mean_squared_error(y_test, predictions, squared=False)
-    r2 = r2_score(y_test, predictions)
-
-    log_step(logger, f"Evaluation - RMSE: {rmse:.3f}, R²: {r2:.3f}")
+    metrics = {
+        "RMSE": root_mean_squared_error(y_test, predictions, squared=False),
+        "MAE": mean_absolute_error(y_test, predictions),
+        "R2": r2_score(y_test, predictions),
+        "Explained_Variance": explained_variance_score(y_test, predictions)
+    }
+    metrics_str = ", ".join(f"{k}: {v:.4f}" for k, v in metrics.items())
+    log_step(logger, f"Evaluation - {metrics_str}")
 
     # --- Save model ---
     output_dir = config['output']['model_dir']
