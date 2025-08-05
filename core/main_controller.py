@@ -8,6 +8,8 @@ import traceback
 import pandas as pd
 import geopandas as gpd
 from core import gis_handler, aoi_landcover_analysis
+from core import protected_area_analysis
+from utils.logging_utils import log_step
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -103,6 +105,17 @@ def run_aoi_analysis(country_code, logger):
     aoi_gdf = load_country_aoi(country_code, logger)
     corine_path = ensure_country_corine_layer(country_code, aoi_gdf, logger)
 
+    # ---- Protected Areas Analysis: Place here ----
+    log_step(logger, "[PROTECTED] Loading protected area data (Natura2000)...")
+    natura_gdf = protected_area_analysis.load_protected_areas("natura2000")
+
+    log_step(logger, "[PROTECTED] Computing AOI intersection with Natura2000...")
+    clipped_natura, total_natura_overlap = protected_area_analysis.intersect_aoi_with_protected(aoi_gdf, natura_gdf)
+    natura_summary = protected_area_analysis.summarize_overlap(clipped_natura)
+    log_step(logger, f"[PROTECTED] Natura2000 overlap: {total_natura_overlap:.1f} ha; details: {natura_summary}")
+    # (Optional) Save clipped_natura or natura_summary as file here
+    # -------------------------------------------------
+
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
         aoi_gdf, country_code, corine_path
@@ -112,6 +125,9 @@ def run_aoi_analysis(country_code, logger):
     with pd.ExcelWriter(output_xlsx) as writer:
         landcover_summary.to_excel(writer, sheet_name="Land Cover Summary", index=False)
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
+        # Optionally add Natura summary
+        if natura_summary:
+            pd.DataFrame(natura_summary).to_excel(writer, sheet_name="Natura2000 Overlap", index=False)
 
     logger.info(f"[OUTPUT] Summary written to {output_xlsx}")
     log_memory_usage(logger, "After full AOI analysis")
