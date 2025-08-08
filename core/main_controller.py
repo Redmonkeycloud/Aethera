@@ -1,26 +1,28 @@
-# main_controller.py
+# core/main_controller.py
 
 import os
 import sys
 import argparse
-import time
-import traceback
 import pandas as pd
 import geopandas as gpd
-from core import buffer_analysis
-from core import protected_area_analysis
+
 from core import gis_handler, aoi_landcover_analysis
-from utils.logging_utils import log_step
+from core import protected_area_analysis as paa
+# (Optional) proximity later:
+# from core import buffer_analysis
+
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+
 
 def ensure_directories(logger):
     """Create necessary base folders if missing."""
     for folder in ["data", "outputs"]:
         os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
     log_step(logger, "[INIT] Folder structure ensured.")
+
 
 def ensure_base_datasets(country_code, logger):
     """Check and download required base datasets if missing."""
@@ -31,26 +33,35 @@ def ensure_base_datasets(country_code, logger):
         "GADM": os.path.join(DATA_DIR, "gadm"),
         "EUROSTAT": os.path.join(DATA_DIR, "eurostat"),
         "CORINE": os.path.join(DATA_DIR, "corine"),
+        # Optional: where you place protected datasets
+        "PA_NATURA": os.path.join(DATA_DIR, "protected_areas", "natura2000"),
+        "PA_WDPA": os.path.join(DATA_DIR, "protected_areas", "wdpa"),
     }
 
     for path in dirs.values():
         os.makedirs(path, exist_ok=True)
 
+    # Natural Earth (admin boundaries world)
     if not os.listdir(dirs["NATURAL_EARTH"]):
         gis_handler.download_natural_earth()
 
+    # GADM (per country admin)
     gadm_file = os.path.join(dirs["GADM"], f"gadm41_{country_code}_0.shp")
     if not os.path.exists(gadm_file):
         gis_handler.download_gadm(country_code)
 
+    # Eurostat NUTS (optional base layer)
     if not os.listdir(dirs["EUROSTAT"]):
         gis_handler.download_eurostat()
 
-    if not any(f.endswith(".gpkg") for f in os.listdir(dirs["CORINE"])):
+    # CORINE (manual GPKG expected)
+    corine_files = os.listdir(dirs["CORINE"])
+    if not any(f.lower().endswith(".gpkg") for f in corine_files):
         logger.warning("[CORINE] Please manually place the CORINE GPKG into /data/corine/")
 
     log_step(logger, "[INIT] All base datasets ready.")
     log_memory_usage(logger, "After base dataset check")
+
 
 def load_country_aoi(country_code, logger):
     gadm_path = os.path.join(DATA_DIR, "gadm", f"gadm41_{country_code}_shp", f"gadm41_{country_code}_0.shp")
@@ -67,24 +78,29 @@ def load_country_aoi(country_code, logger):
     if aoi.empty:
         raise ValueError(f"Country code {country_code} not found in GADM data.")
 
-    name_col = "COUNTRY" if "COUNTRY" in aoi.columns else "NAME_0" if "NAME_0" in aoi.columns else "Unknown"
-    logger.info(f"[AOI] Selected country: {country_code} - {aoi.iloc[0].get(name_col, 'Unknown')}")
+    name_col = "COUNTRY" if "COUNTRY" in aoi.columns else "NAME_0" if "NAME_0" in aoi.columns else None
+    nice_name = aoi.iloc[0][name_col] if name_col else country_code
+    log_step(logger, f"[AOI] Selected country: {country_code} - {nice_name}")
     return aoi
 
+
 def ensure_country_corine_layer(country_code, aoi_gdf, logger):
+    """
+    Clip the full CORINE GPKG to the AOI and save a country-specific shapefile once.
+    """
     corine_dir = os.path.join(DATA_DIR, "corine")
     layer = "U2018_CLC2018_V2020_20u1"
     gpkg_path = os.path.join(corine_dir, f"{layer}.gpkg")
     output_path = os.path.join(corine_dir, f"corine_{country_code}.shp")
 
     if os.path.exists(output_path):
-        logger.info(f"[CORINE] Using cached clipped file: {output_path}")
+        log_step(logger, f"[CORINE] Using cached clipped file: {output_path}")
         return output_path
 
     if not os.path.exists(gpkg_path):
         raise FileNotFoundError(f"Missing CORINE GPKG: {gpkg_path}")
 
-    logger.info(f"[CORINE] Clipping country {country_code} from CORINE GPKG...")
+    log_step(logger, f"[CORINE] Clipping country {country_code} from CORINE GPKG...")
     bbox = aoi_gdf.to_crs("EPSG:3035").total_bounds
     full_gdf = gpd.read_file(gpkg_path, layer=layer, bbox=tuple(bbox))
 
@@ -99,58 +115,45 @@ def ensure_country_corine_layer(country_code, aoi_gdf, logger):
         raise ValueError(f"[ERROR] No intersection between CORINE and AOI for {country_code}.")
 
     clipped.to_file(output_path)
-    logger.info(f"[CORINE] Saved to {output_path}")
+    log_step(logger, f"[CORINE] Saved clipped layer to {output_path}")
     return output_path
 
+
 def run_aoi_analysis(country_code, logger):
+    # (1) AOI
     aoi_gdf = load_country_aoi(country_code, logger)
+
+    # (2) CORINE clip (cached)
     corine_path = ensure_country_corine_layer(country_code, aoi_gdf, logger)
 
-    # ---- Multi-PA Layers Analysis: Insert here ----
-    PA_LAYERS = [
-        {"name": "Natura2000", "path": "/absolute/path/to/natura2000.csv", "type": "csv", "csv_lat_col": "lat", "csv_lon_col": "lon"},
-        {"name": "WDPA", "path": "/absolute/path/to/wdpa.shp", "type": "shp"}
-        # Add more PA layers here as needed
-    ]
+    # (3) Protected Areas (Natura preferred, WDPA fallback optional)
+    log_step(logger, "[PROTECTED] Loading protected area data (prefer=Natura2000)...")
+    pa_gdf, pa_source = paa.load_protected_areas(prefer="natura", use_wdpa_fallback=True)
+    log_step(logger, f"[PROTECTED] Source loaded: {pa_source} | features={len(pa_gdf)}")
 
-    all_pa_reports = []
-    for pa in PA_LAYERS:
-        log_step(logger, f"[PROTECTED] Loading {pa['name']} data...")
-        if pa["type"] == "csv":
-            pa_gdf = protected_area_analysis.load_protected_areas(
-                pa['name'], pa['path'], csv_lat_col=pa['csv_lat_col'], csv_lon_col=pa['csv_lon_col']
-            )
-        else:
-            pa_gdf = protected_area_analysis.load_protected_areas(pa['name'], pa['path'])
-        log_step(logger, f"[PROTECTED] Computing AOI intersection with {pa['name']}...")
-        clipped_pa, total_pa_overlap = protected_area_analysis.intersect_aoi_with_protected(aoi_gdf, pa_gdf)
-        pa_summary = protected_area_analysis.summarize_overlap(clipped_pa, pa['name'])
-        all_pa_reports.append(pa_summary)
-        log_step(logger, f"[PROTECTED] {pa['name']} overlap: {total_pa_overlap:.1f} ha; details: {pa_summary}")
+    log_step(logger, "[PROTECTED] Computing AOI intersection with protected areas...")
+    clipped_pa, total_pa_overlap = paa.intersect_aoi_with_protected(aoi_gdf, pa_gdf, area_crs="EPSG:3035")
+    pa_summary_df = paa.summarize_overlap_table(clipped_pa)
 
-        # (Optional) Save clipped_pa or pa_summary to file
+    log_step(logger, f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}")
 
-    # ---- End Multi-PA Block ----
+    # (Optional) Save the clipped protected polygons for mapping
+    # paa.save_clipped_as_geojson(clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson"))
 
+    # (4) Land cover & emissions
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
         aoi_gdf, country_code, corine_path
     )
 
+    # (5) Save outputs
     output_xlsx = os.path.join(BASE_DIR, "outputs", f"analysis_summary_{country_code}.xlsx")
-    with pd.ExcelWriter(output_xlsx) as writer:
+    with pd.ExcelWriter(output_xlsx, mode="w") as writer:
         landcover_summary.to_excel(writer, sheet_name="Land Cover Summary", index=False)
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
-        # Add a summary sheet for each PA layer
-        for pa_summary in all_pa_reports:
-            # Wrap in list in case summarize_overlap returns a dict
-            pd.DataFrame([pa_summary]).to_excel(writer, sheet_name=f"{pa_summary['layer']}_Overlap", index=False)
+        pa_summary_df.to_excel(writer, sheet_name=f"{pa_source}_Overlap", index=False)
 
-        # Optionally: add a combined summary sheet
-        combined_df = pd.DataFrame(all_pa_reports)
-        combined_df.to_excel(writer, sheet_name="All_PA_Summary", index=False)
-
-    logger.info(f"[OUTPUT] Summary written to {output_xlsx}")
+    log_step(logger, f"[OUTPUT] Summary written to {output_xlsx}")
     log_memory_usage(logger, "After full AOI analysis")
 
 
@@ -178,6 +181,7 @@ def main():
     except Exception as e:
         log_exception(logger, "Unhandled exception in AETHERA main pipeline", e)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
