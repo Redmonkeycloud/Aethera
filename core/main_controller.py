@@ -7,8 +7,9 @@ import time
 import traceback
 import pandas as pd
 import geopandas as gpd
-from core import gis_handler, aoi_landcover_analysis
+from core import buffer_analysis
 from core import protected_area_analysis
+from core import gis_handler, aoi_landcover_analysis
 from utils.logging_utils import log_step
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
 
@@ -105,16 +106,31 @@ def run_aoi_analysis(country_code, logger):
     aoi_gdf = load_country_aoi(country_code, logger)
     corine_path = ensure_country_corine_layer(country_code, aoi_gdf, logger)
 
-    # ---- Protected Areas Analysis: Place here ----
-    log_step(logger, "[PROTECTED] Loading protected area data (Natura2000)...")
-    natura_gdf = protected_area_analysis.load_protected_areas("natura2000")
+    # ---- Multi-PA Layers Analysis: Insert here ----
+    PA_LAYERS = [
+        {"name": "Natura2000", "path": "/absolute/path/to/natura2000.csv", "type": "csv", "csv_lat_col": "lat", "csv_lon_col": "lon"},
+        {"name": "WDPA", "path": "/absolute/path/to/wdpa.shp", "type": "shp"}
+        # Add more PA layers here as needed
+    ]
 
-    log_step(logger, "[PROTECTED] Computing AOI intersection with Natura2000...")
-    clipped_natura, total_natura_overlap = protected_area_analysis.intersect_aoi_with_protected(aoi_gdf, natura_gdf)
-    natura_summary = protected_area_analysis.summarize_overlap(clipped_natura)
-    log_step(logger, f"[PROTECTED] Natura2000 overlap: {total_natura_overlap:.1f} ha; details: {natura_summary}")
-    # (Optional) Save clipped_natura or natura_summary as file here
-    # -------------------------------------------------
+    all_pa_reports = []
+    for pa in PA_LAYERS:
+        log_step(logger, f"[PROTECTED] Loading {pa['name']} data...")
+        if pa["type"] == "csv":
+            pa_gdf = protected_area_analysis.load_protected_areas(
+                pa['name'], pa['path'], csv_lat_col=pa['csv_lat_col'], csv_lon_col=pa['csv_lon_col']
+            )
+        else:
+            pa_gdf = protected_area_analysis.load_protected_areas(pa['name'], pa['path'])
+        log_step(logger, f"[PROTECTED] Computing AOI intersection with {pa['name']}...")
+        clipped_pa, total_pa_overlap = protected_area_analysis.intersect_aoi_with_protected(aoi_gdf, pa_gdf)
+        pa_summary = protected_area_analysis.summarize_overlap(clipped_pa, pa['name'])
+        all_pa_reports.append(pa_summary)
+        log_step(logger, f"[PROTECTED] {pa['name']} overlap: {total_pa_overlap:.1f} ha; details: {pa_summary}")
+
+        # (Optional) Save clipped_pa or pa_summary to file
+
+    # ---- End Multi-PA Block ----
 
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
@@ -125,12 +141,18 @@ def run_aoi_analysis(country_code, logger):
     with pd.ExcelWriter(output_xlsx) as writer:
         landcover_summary.to_excel(writer, sheet_name="Land Cover Summary", index=False)
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
-        # Optionally add Natura summary
-        if natura_summary:
-            pd.DataFrame(natura_summary).to_excel(writer, sheet_name="Natura2000 Overlap", index=False)
+        # Add a summary sheet for each PA layer
+        for pa_summary in all_pa_reports:
+            # Wrap in list in case summarize_overlap returns a dict
+            pd.DataFrame([pa_summary]).to_excel(writer, sheet_name=f"{pa_summary['layer']}_Overlap", index=False)
+
+        # Optionally: add a combined summary sheet
+        combined_df = pd.DataFrame(all_pa_reports)
+        combined_df.to_excel(writer, sheet_name="All_PA_Summary", index=False)
 
     logger.info(f"[OUTPUT] Summary written to {output_xlsx}")
     log_memory_usage(logger, "After full AOI analysis")
+
 
 def main():
     parser = argparse.ArgumentParser(description="AETHERA: EIA Automated Analysis")
