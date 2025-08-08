@@ -5,24 +5,21 @@ import sys
 import argparse
 import pandas as pd
 import geopandas as gpd
-
 from core import gis_handler, aoi_landcover_analysis
 from core import protected_area_analysis as paa
 # (Optional) proximity later:
 # from core import buffer_analysis
-
+from core.emissions_api import from_corine_summary, monte_carlo_emissions
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-
 
 def ensure_directories(logger):
     """Create necessary base folders if missing."""
     for folder in ["data", "outputs"]:
         os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
     log_step(logger, "[INIT] Folder structure ensured.")
-
 
 def ensure_base_datasets(country_code, logger):
     """Check and download required base datasets if missing."""
@@ -62,7 +59,6 @@ def ensure_base_datasets(country_code, logger):
     log_step(logger, "[INIT] All base datasets ready.")
     log_memory_usage(logger, "After base dataset check")
 
-
 def load_country_aoi(country_code, logger):
     gadm_path = os.path.join(DATA_DIR, "gadm", f"gadm41_{country_code}_shp", f"gadm41_{country_code}_0.shp")
     if not os.path.exists(gadm_path):
@@ -82,7 +78,6 @@ def load_country_aoi(country_code, logger):
     nice_name = aoi.iloc[0][name_col] if name_col else country_code
     log_step(logger, f"[AOI] Selected country: {country_code} - {nice_name}")
     return aoi
-
 
 def ensure_country_corine_layer(country_code, aoi_gdf, logger):
     """
@@ -118,7 +113,6 @@ def ensure_country_corine_layer(country_code, aoi_gdf, logger):
     log_step(logger, f"[CORINE] Saved clipped layer to {output_path}")
     return output_path
 
-
 def run_aoi_analysis(country_code, logger):
     # (1) AOI
     aoi_gdf = load_country_aoi(country_code, logger)
@@ -138,24 +132,38 @@ def run_aoi_analysis(country_code, logger):
     log_step(logger, f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}")
 
     # (Optional) Save the clipped protected polygons for mapping
-    # paa.save_clipped_as_geojson(clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson"))
+    paa.save_clipped_as_geojson(clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson"))
 
     # (4) Land cover & emissions
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
     landcover_summary, emissions_summary = aoi_landcover_analysis.run_full_analysis(
-        aoi_gdf, country_code, corine_path
+        aoi_gdf, country_code, corine_path, logger=logger
     )
+
+    # --- NEW: Emissions Uncertainty (Monte Carlo) ---
+    try:
+        log_step(logger, "[EMISSIONS] Computing uncertainty via Monte Carlo (n_sim=2000)...")
+        cat_areas = from_corine_summary(landcover_summary)                     # category → area_ha
+        mc_df = monte_carlo_emissions(cat_areas, country=country_code, years=1, n_sim=2000)
+    except Exception as e:
+        # If anything goes sideways, keep pipeline running and log the issue
+        mc_df = pd.DataFrame([{"n_sim": 0, "years": 1,
+                               "total_mean_tCO2e": None,
+                               "total_p05_tCO2e": None,
+                               "total_p50_tCO2e": None,
+                               "total_p95_tCO2e": None}])
+        logger.warning(f"[EMISSIONS] Monte Carlo failed: {e}")
 
     # (5) Save outputs
     output_xlsx = os.path.join(BASE_DIR, "outputs", f"analysis_summary_{country_code}.xlsx")
     with pd.ExcelWriter(output_xlsx, mode="w") as writer:
         landcover_summary.to_excel(writer, sheet_name="Land Cover Summary", index=False)
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
+        mc_df.to_excel(writer, sheet_name="Emissions Uncertainty (MC)", index=False)
         pa_summary_df.to_excel(writer, sheet_name=f"{pa_source}_Overlap", index=False)
 
     log_step(logger, f"[OUTPUT] Summary written to {output_xlsx}")
     log_memory_usage(logger, "After full AOI analysis")
-
 
 def main():
     parser = argparse.ArgumentParser(description="AETHERA: EIA Automated Analysis")
@@ -181,7 +189,6 @@ def main():
     except Exception as e:
         log_exception(logger, "Unhandled exception in AETHERA main pipeline", e)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

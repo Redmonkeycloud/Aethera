@@ -5,8 +5,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 from typing import Optional, Tuple, Dict, Any
-
-from core.emissions_api import estimate_emissions
+from core.emissions_api import estimate_from_corine_summary
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
@@ -186,9 +185,10 @@ def run_full_analysis(
     """
     clipped_gdf, landcover_summary = intersect_aoi_with_corine(aoi_gdf, corine_shapefile_path, logger=logger)
 
-    # Prepare land cover stats for emissions (label → hectares)
-    lc_stats = {row["land_cover"]: float(row["area_hectares"]) for _, row in landcover_summary.iterrows()}
-    emissions_summary = estimate_emissions(lc_stats)
+    landcover_summary_df = landcover_summary  # what you already computed
+    emissions_summary = estimate_from_corine_summary(
+                        landcover_summary_df, country=country_code, years=1
+                        )
 
     # Save clipped GeoJSON
     clipped_geojson = os.path.join(OUTPUT_DIR, f"clipped_landcover_{country_code}.geojson")
