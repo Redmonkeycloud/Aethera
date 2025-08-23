@@ -6,6 +6,7 @@ import argparse
 import pandas as pd
 import geopandas as gpd
 from core import buffer_analysis as ba
+from core.osm_utils import pbf_to_roads_gpkg
 from core import protected_area_analysis as paa
 from core import gis_handler, aoi_landcover_analysis
 # (Optional) proximity later:
@@ -124,26 +125,16 @@ def run_aoi_analysis(country_code, logger):
 
     # (3) Protected Areas (Natura preferred, WDPA fallback optional)
     log_step(logger, "[PROTECTED] Loading protected area data (prefer=Natura2000)...")
-    pa_gdf, pa_source = paa.load_protected_areas(
-        prefer="natura", use_wdpa_fallback=True
-    )
+    pa_gdf, pa_source = paa.load_protected_areas(prefer="natura", use_wdpa_fallback=True)
     log_step(logger, f"[PROTECTED] Source loaded: {pa_source} | features={len(pa_gdf)}")
 
     log_step(logger, "[PROTECTED] Computing AOI intersection with protected areas...")
-    clipped_pa, total_pa_overlap = paa.intersect_aoi_with_protected(
-        aoi_gdf, pa_gdf, area_crs="EPSG:3035"
-    )
+    clipped_pa, total_pa_overlap = paa.intersect_aoi_with_protected(aoi_gdf, pa_gdf, area_crs="EPSG:3035")
     pa_summary_df = paa.summarize_overlap_table(clipped_pa)
+    log_step(logger, f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}")
 
-    log_step(
-        logger,
-        f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}"
-    )
-
-    # (Optional) Save the clipped protected polygons for mapping
-    paa.save_clipped_as_geojson(
-        clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson")
-    )
+    # (Optional) save clipped PA for mapping
+    # paa.save_clipped_as_geojson(clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson"))
 
     # (4) Land cover & emissions
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
@@ -151,56 +142,81 @@ def run_aoi_analysis(country_code, logger):
         aoi_gdf, country_code, corine_path, logger=logger
     )
 
-    # --- (4a) Emissions Uncertainty (Monte Carlo) ---
+    # (4a) Emissions Uncertainty (Monte Carlo)
     try:
-        log_step(logger, "[EMISSIONS] Computing uncertainty via Monte Carlo (n_sim=2000)...")
-        cat_areas = from_corine_summary(landcover_summary)  # category → area_ha
+        log_step(logger, "[EMISSIONS] Monte Carlo uncertainty (n_sim=2000)...")
+        cat_areas = from_corine_summary(landcover_summary)
         mc_df = monte_carlo_emissions(cat_areas, country=country_code, years=1, n_sim=2000)
     except Exception as e:
         mc_df = pd.DataFrame([{
             "n_sim": 0, "years": 1,
-            "total_mean_tCO2e": None,
-            "total_p05_tCO2e": None,
-            "total_p50_tCO2e": None,
-            "total_p95_tCO2e": None
+            "total_mean_tCO2e": None, "total_p05_tCO2e": None,
+            "total_p50_tCO2e": None, "total_p95_tCO2e": None
         }])
         logger.warning(f"[EMISSIONS] Monte Carlo failed: {e}")
 
-    # --- (4b) Optional proximity analysis (roads/rivers) if data present ---
+    # (4b) Optional proximity analysis (roads/rivers)
     proximity_reports = {}
-    transport_dir = os.path.join(DATA_DIR, "transport")
-    os.makedirs(transport_dir, exist_ok=True)
 
-    candidates = [
-        ("roads",  os.path.join(transport_dir, "roads.gpkg")),
-        ("rivers", os.path.join(transport_dir, "rivers.gpkg")),
-    ]
-    for label, path in candidates:
-        if os.path.exists(path):
+    # --- Rivers (HydroRIVERS) ---
+    rivers_dir = os.path.join(DATA_DIR, "rivers")
+    rivers_shp = None
+    if os.path.isdir(rivers_dir):
+        for fname in os.listdir(rivers_dir):
+            if fname.lower().endswith(".shp"):
+                rivers_shp = os.path.join(rivers_dir, fname)
+                break
+    if rivers_shp and os.path.exists(rivers_shp):
+        try:
+            log_step(logger, f"[PROX] Loading rivers from {rivers_shp}")
+            rivers_gdf = ba.load_vector_data(rivers_shp)
+            prox = ba.run_proximity_suite(
+                aoi_gdf=aoi_gdf,
+                features_gdf=rivers_gdf,
+                features_label="rivers",
+                buffer_distances_m=(100, 250, 500, 1000),
+                dissolve_buffers=True,
+                logger=logger,
+            )
+            proximity_reports["rivers"] = prox
+            stats = prox["distance_stats"]
+            log_step(logger, f"[PROX] rivers: min={stats['min_m']:.1f} m, p50={stats['p50_m']:.1f} m, p95={stats['p95_m']:.1f} m")
+        except Exception as e:
+            logger.warning(f"[PROX] rivers analysis failed: {e}")
+    else:
+        logger.info(f"[PROX] Skipping rivers: no .shp found in {rivers_dir}")
+
+    # --- Roads (OSM) ---
+    roads_dir = os.path.join(DATA_DIR, "roads")
+    roads_gpkg = os.path.join(roads_dir, "roads.gpkg")
+    if not os.path.exists(roads_gpkg):
+        # try build from PBF if present
+        pbf = os.path.join(roads_dir, "greece-latest.osm.pbf")
+        if os.path.exists(pbf):
             try:
-                log_step(logger, f"[PROX] Loading {label} from {path}")
-                feats = ba.load_vector_data(path)
-
-                prox = ba.run_proximity_suite(
-                    aoi_gdf=aoi_gdf,
-                    features_gdf=feats,
-                    features_label=label,
-                    buffer_distances_m=(100, 250, 500, 1000),
-                    dissolve_buffers=True,
-                    logger=logger,
-                )
-                proximity_reports[label] = prox
-
-                stats = prox["distance_stats"]
-                log_step(
-                    logger,
-                    f"[PROX] {label}: min={stats['min_m']:.1f} m, p50={stats['p50_m']:.1f} m, "
-                    f"p95={stats['p95_m']:.1f} m"
-                )
+                log_step(logger, f"[OSM] Building roads.gpkg from {pbf} (first run only)...")
+                pbf_to_roads_gpkg(pbf, roads_gpkg, logger=logger)
             except Exception as e:
-                logger.warning(f"[PROX] {label} analysis failed: {e}")
-        else:
-            logger.info(f"[PROX] Skipping {label}: file not found at {path}")
+                logger.warning(f"[OSM] Could not build roads from PBF: {e}")
+    if os.path.exists(roads_gpkg):
+        try:
+            log_step(logger, f"[PROX] Loading roads from {roads_gpkg}")
+            roads_gdf = ba.load_vector_data(roads_gpkg)
+            prox = ba.run_proximity_suite(
+                aoi_gdf=aoi_gdf,
+                features_gdf=roads_gdf,
+                features_label="roads",
+                buffer_distances_m=(100, 250, 500, 1000),
+                dissolve_buffers=True,
+                logger=logger,
+            )
+            proximity_reports["roads"] = prox
+            stats = prox["distance_stats"]
+            log_step(logger, f"[PROX] roads: min={stats['min_m']:.1f} m, p50={stats['p50_m']:.1f} m, p95={stats['p95_m']:.1f} m")
+        except Exception as e:
+            logger.warning(f"[PROX] roads analysis failed: {e}")
+    else:
+        logger.info(f"[PROX] Skipping roads: roads.gpkg not found and PBF conversion unavailable")
 
     # (5) Save outputs
     output_xlsx = os.path.join(BASE_DIR, "outputs", f"analysis_summary_{country_code}.xlsx")
