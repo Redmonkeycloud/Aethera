@@ -1,16 +1,18 @@
-# core/main_controller.py
+# main_controller.py
 
 import os
 import sys
 import argparse
 import pandas as pd
 import geopandas as gpd
-from core import gis_handler, aoi_landcover_analysis
+from core import buffer_analysis as ba
 from core import protected_area_analysis as paa
+from core import gis_handler, aoi_landcover_analysis
 # (Optional) proximity later:
 # from core import buffer_analysis
 from core.emissions_api import from_corine_summary, monte_carlo_emissions
 from utils.logging_utils import setup_logger, log_memory_usage, log_step, log_exception
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -122,17 +124,26 @@ def run_aoi_analysis(country_code, logger):
 
     # (3) Protected Areas (Natura preferred, WDPA fallback optional)
     log_step(logger, "[PROTECTED] Loading protected area data (prefer=Natura2000)...")
-    pa_gdf, pa_source = paa.load_protected_areas(prefer="natura", use_wdpa_fallback=True)
+    pa_gdf, pa_source = paa.load_protected_areas(
+        prefer="natura", use_wdpa_fallback=True
+    )
     log_step(logger, f"[PROTECTED] Source loaded: {pa_source} | features={len(pa_gdf)}")
 
     log_step(logger, "[PROTECTED] Computing AOI intersection with protected areas...")
-    clipped_pa, total_pa_overlap = paa.intersect_aoi_with_protected(aoi_gdf, pa_gdf, area_crs="EPSG:3035")
+    clipped_pa, total_pa_overlap = paa.intersect_aoi_with_protected(
+        aoi_gdf, pa_gdf, area_crs="EPSG:3035"
+    )
     pa_summary_df = paa.summarize_overlap_table(clipped_pa)
 
-    log_step(logger, f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}")
+    log_step(
+        logger,
+        f"[PROTECTED] Total overlap: {total_pa_overlap:.1f} ha | Sites in overlap: {len(pa_summary_df)}"
+    )
 
     # (Optional) Save the clipped protected polygons for mapping
-    paa.save_clipped_as_geojson(clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson"))
+    paa.save_clipped_as_geojson(
+        clipped_pa, os.path.join(BASE_DIR, "outputs", f"clipped_{pa_source}_{country_code}.geojson")
+    )
 
     # (4) Land cover & emissions
     log_step(logger, "[RUN] Running land cover & emissions analysis...")
@@ -140,19 +151,56 @@ def run_aoi_analysis(country_code, logger):
         aoi_gdf, country_code, corine_path, logger=logger
     )
 
-    # --- NEW: Emissions Uncertainty (Monte Carlo) ---
+    # --- (4a) Emissions Uncertainty (Monte Carlo) ---
     try:
         log_step(logger, "[EMISSIONS] Computing uncertainty via Monte Carlo (n_sim=2000)...")
-        cat_areas = from_corine_summary(landcover_summary)                     # category → area_ha
+        cat_areas = from_corine_summary(landcover_summary)  # category → area_ha
         mc_df = monte_carlo_emissions(cat_areas, country=country_code, years=1, n_sim=2000)
     except Exception as e:
-        # If anything goes sideways, keep pipeline running and log the issue
-        mc_df = pd.DataFrame([{"n_sim": 0, "years": 1,
-                               "total_mean_tCO2e": None,
-                               "total_p05_tCO2e": None,
-                               "total_p50_tCO2e": None,
-                               "total_p95_tCO2e": None}])
+        mc_df = pd.DataFrame([{
+            "n_sim": 0, "years": 1,
+            "total_mean_tCO2e": None,
+            "total_p05_tCO2e": None,
+            "total_p50_tCO2e": None,
+            "total_p95_tCO2e": None
+        }])
         logger.warning(f"[EMISSIONS] Monte Carlo failed: {e}")
+
+    # --- (4b) Optional proximity analysis (roads/rivers) if data present ---
+    proximity_reports = {}
+    transport_dir = os.path.join(DATA_DIR, "transport")
+    os.makedirs(transport_dir, exist_ok=True)
+
+    candidates = [
+        ("roads",  os.path.join(transport_dir, "roads.gpkg")),
+        ("rivers", os.path.join(transport_dir, "rivers.gpkg")),
+    ]
+    for label, path in candidates:
+        if os.path.exists(path):
+            try:
+                log_step(logger, f"[PROX] Loading {label} from {path}")
+                feats = ba.load_vector_data(path)
+
+                prox = ba.run_proximity_suite(
+                    aoi_gdf=aoi_gdf,
+                    features_gdf=feats,
+                    features_label=label,
+                    buffer_distances_m=(100, 250, 500, 1000),
+                    dissolve_buffers=True,
+                    logger=logger,
+                )
+                proximity_reports[label] = prox
+
+                stats = prox["distance_stats"]
+                log_step(
+                    logger,
+                    f"[PROX] {label}: min={stats['min_m']:.1f} m, p50={stats['p50_m']:.1f} m, "
+                    f"p95={stats['p95_m']:.1f} m"
+                )
+            except Exception as e:
+                logger.warning(f"[PROX] {label} analysis failed: {e}")
+        else:
+            logger.info(f"[PROX] Skipping {label}: file not found at {path}")
 
     # (5) Save outputs
     output_xlsx = os.path.join(BASE_DIR, "outputs", f"analysis_summary_{country_code}.xlsx")
@@ -161,6 +209,13 @@ def run_aoi_analysis(country_code, logger):
         emissions_summary.to_excel(writer, sheet_name="Emissions Summary", index=False)
         mc_df.to_excel(writer, sheet_name="Emissions Uncertainty (MC)", index=False)
         pa_summary_df.to_excel(writer, sheet_name=f"{pa_source}_Overlap", index=False)
+
+        # Add proximity sheets if present
+        for label, rep in proximity_reports.items():
+            rep["buffer_overlap"].to_excel(writer, sheet_name=f"{label.title()} Buffers", index=False)
+            pd.DataFrame([rep["distance_stats"]]).to_excel(
+                writer, sheet_name=f"{label.title()} Dist Stats", index=False
+            )
 
     log_step(logger, f"[OUTPUT] Summary written to {output_xlsx}")
     log_memory_usage(logger, "After full AOI analysis")
