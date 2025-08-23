@@ -1,93 +1,110 @@
-**“Advanced Spatial Analytics”** 
+**“Advanced Spatial Analytics”**
 ---
 
-# **1. Buffering (Distance Analysis)**
+# ✅ 1. Buffering (Distance / Proximity Analysis)
 
-**a. Typical use cases:**
+**Status:** Implemented (roads + rivers)
 
-* Minimum distance from roads, settlements, rivers, protected areas
-* Legal compliance (e.g., 500m from Natura2000, 100m from streams)
+**What’s implemented:**
+- `core/buffer_analysis.py`:
+  - Fast minimum distance per AOI polygon using Shapely 2.0 `STRtree.nearest`
+  - Multi-distance buffers (100/250/500/1000m), optional dissolve, and AOI buffer overlap (% of AOI)
+  - Summary statistics (mean/min/max, p50, p95) for distances
+  - Rivers loader with bbox clip and metric CRS checks
+- Roads ingestion and caching via `core/osm_utils.py`:
+  - OSMnx download (per ISO country) with *local caching* to GPKG
+  - Optional PBF→roads using pyrosm (if pyrosm installed)
+  - Automatic reuse of cached GPKG on subsequent runs
+- Integrated in `core/main_controller.py`:
+  - Computes nearest distance from AOI to **roads** and **rivers (HydroRIVERS)**
+  - Saves per-AOI nearest tables as GeoJSON and summary sheets in Excel
 
-**b. Direct Actions:**
+**Data sources:**
+- **Roads**: OSM via OSMnx (Overpass) or local `.pbf` (pyrosm)  
+- **Rivers**: HydroRIVERS (EU or global) — local shapefile
 
-* Add a `buffer_analysis.py` in `core/` (or as a utility module)
-* For each relevant layer (roads, rivers, settlements, protected areas), compute a buffer (GeoPandas: `gdf.buffer(distance_meters)`)
-* Use `gpd.overlay()` to check project AOI intersection or proximity with each buffer
-* Output for reporting:
+**Outputs:**
+- `outputs/aoi_nearest_roads_<ISO3>.geojson`
+- `outputs/aoi_nearest_rivers_<ISO3>.geojson`
+- Excel sheets: `Proximity_Roads_Summary`, `Proximity_Rivers_Summary`
 
-  * “Project AOI is within 180m of nearest river (legal minimum: 100m)”
-  * Maps showing buffers and intersections
-
-**c. Data:**
-
-* Download OSM roads/rivers (e.g., via OSMnx or pre-prepared layers)
-* Use Natural Earth for basic data, upgrade to Eurostat/OSM for detail
-
----
-
-# **2. Protected Area Intersection (Natura2000, WDPA, etc.)**
-
-**a. Use cases:**
-
-* Regulatory exclusion or assessment triggers
-* Species/habitat overlays
-
-**b. Direct Actions:**
-
-* Add a `protected_area_analysis.py` in `core/`
-* Download/load protected areas:
-
-  * **Natura2000**: [Download shapefile here](https://www.eea.europa.eu/data-and-maps/data/natura-11)
-  * **WDPA**: [Download here](https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA)
-* Reproject if needed, use `gpd.overlay(aoi_gdf, protected_areas_gdf, how="intersection")`
-* Output:
-
-  * List all protected area types that overlap/intersect AOI
-  * Area statistics, summary for reporting
+**Next enhancements:**
+- Add PNG maps: AOI + buffers + nearest feature lines
+- Add distance-to-grid (if energy grid layers provided)
+- Add settlements/ports/airports proximity (optional OSMnx queries)
 
 ---
 
-# **3. Watershed/Hydrological Tools (optional, if relevant)**
+# ✅ 2. Protected Area Intersection (Natura2000, WDPA)
 
-**a. Use cases:**
+**Status:** Implemented (with Natura2000 shapefile preferred; WDPA fallback)
 
-* Impacts on catchments, runoff, flood risk, water quality
+**What’s implemented:**
+- `core/protected_area_analysis.py`:
+  - Loads **Natura2000** shapefile (EPSG:3035 recommended) OR **WDPA** polygons if Natura is missing
+  - CRS normalization and area calculation in metric CRS
+  - AOI intersection and per-site overlap summary (site_code, site_name, overlap_ha)
+  - Optional GeoJSON export of clipped protected areas
+- Integrated in `core/main_controller.py`:
+  - Summaries saved in Excel as `<Source>_Overlap` sheet
+  - Fallback logic: attempts Natura first → WDPA if not present
 
-**b. Direct Actions:**
+**Data sources:**
+- **Natura2000** shapefile (EEA):  
+  https://www.eea.europa.eu/data-and-maps/data/natura-11
+- **WDPA** polygons:  
+  https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA
 
-* Add a `hydro_analysis.py` (or expand `gis_handler.py`)
-* Download catchment/watershed data (e.g., [HydroSHEDS](https://www.hydrosheds.org/), [EU CCM2](https://data.jrc.ec.europa.eu/collection/id-0053))
-* Use raster/vector intersection to map project to catchment or drainage area
-* Optional: Use raster DEM to delineate local watershed (with raster tools, e.g., richdem or whitebox)
-
----
-
-# **4. Raster Data Ingestion (Remote Sensing Layers)**
-
-**a. Use cases:**
-
-* NDVI/vegetation, bare soil, burnt area, imperviousness
-* Surface temperature, soil moisture
-
-**b. Direct Actions:**
-
-* Add `raster_ingestion.py` or expand `gis_handler.py`
-* Use `rasterio` for GeoTIFF reading
-* Clip/crop raster to AOI polygon (use `rasterio.mask`)
-* Summarize stats per AOI: mean/median, histograms (e.g., average NDVI for project area)
-* Example sources:
-
-  * ESA WorldCover ([download](https://esa-worldcover.org/en))
-  * Sentinel-2 NDVI (can use Google Earth Engine for batch export if needed)
-  * Copernicus Imperviousness
+**Next enhancements:**
+- Add Ramsar, IBAs, Emerald (if needed)
+- Flag legal thresholds (e.g., AOI must avoid specific designations)
 
 ---
 
-## **Python Integration Plan**
+# ⏳ 3. Watershed/Hydrological Tools (optional)
 
-* Each of the above modules gets its own script/class in `core/` (buffer\_analysis.py, protected\_area\_analysis.py, hydro\_analysis.py, raster\_ingestion.py)
-* All steps logged using your `logging_utils`
-* Results saved both as data (tables, CSV) and visualizations (PNG map overlays, possibly GeoJSON for web)
-* Integrate step-by-step into `main_controller.py` pipeline, **but keep the system modular** (user can run each as needed)
+**Status:** Not implemented yet
+
+**Potential actions:**
+- Add `core/hydro_analysis.py`:
+  - Catchment/WBD junction using HydroBASINS/CCM2
+  - If DEM available, basic watershed delineation
+- Data sources:
+  - HydroSHEDS HydroBASINS: https://www.hydrosheds.org/
+  - EU CCM2 (JRC): https://data.jrc.ec.europa.eu/collection/id-0053
 
 ---
+
+# ⏳ 4. Raster Data Ingestion (Remote Sensing)
+
+**Status:** Not implemented yet
+
+**Planned actions:**
+- Add `core/raster_ingestion.py`:
+  - `rasterio` read; `rasterio.mask` crop by AOI
+  - Stats per AOI (mean/median/p95), histograms
+- Example layers:
+  - ESA WorldCover
+  - Sentinel-2 NDVI (locally or via GEE batch)
+
+---
+
+## Python Integration & Logging
+
+- All modules log to the centralized `utils/logging_utils.py` with per-run log files.
+- `main_controller.py` orchestrates:
+  1) AOI (GADM)  
+  2) CORINE clip  
+  3) Protected areas (Natura→WDPA)  
+  4) Land cover + emissions + Monte Carlo  
+  5) Proximity (roads, rivers)  
+  6) Excel export (+ optional GeoJSON maps)
+
+---
+
+## Immediate TODOs (Spatial)
+
+- [ ] Add PNG map exports for buffers and nearest features  
+- [ ] Add distance-to-grid support (if grid GPKG provided under `data/grid/`)  
+- [ ] Add settlements/ports/airports proximity (OSMnx)  
+- [ ] Optional: dask-geopandas for parallelization on big countries
