@@ -12,6 +12,8 @@ import geopandas as gpd
 
 from .analysis.biodiversity import build_biodiversity_features, compute_overlap_metrics
 from .analysis.land_cover import summarize_land_cover
+from .analysis.receptors import calculate_distance_to_receptors
+from .analysis.kpis import calculate_comprehensive_kpis
 from .config.base_settings import settings
 from .datasets.catalog import DatasetCatalog
 from .db import DatabaseClient, ModelRunLogger, ModelRunRecord
@@ -181,6 +183,64 @@ def main() -> None:
     emission_result = emission_calculator.compute(land_cover_summary, project_params)
     gis.save_summary([emission_result.as_dict()], "emissions_summary.json")
 
+    # Distance-to-receptor calculations
+    logger.info("Calculating distances to sensitive receptors...")
+    receptor_analysis = calculate_distance_to_receptors(
+        aoi=aoi,
+        protected_areas=natura_clip if not natura_clip.empty else None,
+        max_distance_km=50.0,
+    )
+    receptor_summary = {
+        "aoi_centroid": {
+            "lon": float(receptor_analysis.aoi_centroid.x),
+            "lat": float(receptor_analysis.aoi_centroid.y),
+        },
+        "nearest_protected_area": (
+            {
+                "receptor_type": receptor_analysis.nearest_protected_area.receptor_type,
+                "receptor_id": receptor_analysis.nearest_protected_area.receptor_id,
+                "receptor_name": receptor_analysis.nearest_protected_area.receptor_name,
+                "distance_km": receptor_analysis.nearest_protected_area.distance_km,
+            }
+            if receptor_analysis.nearest_protected_area
+            else None
+        ),
+        "nearest_settlement": (
+            {
+                "receptor_type": receptor_analysis.nearest_settlement.receptor_type,
+                "receptor_id": receptor_analysis.nearest_settlement.receptor_id,
+                "receptor_name": receptor_analysis.nearest_settlement.receptor_name,
+                "distance_km": receptor_analysis.nearest_settlement.distance_km,
+            }
+            if receptor_analysis.nearest_settlement
+            else None
+        ),
+        "nearest_water_body": (
+            {
+                "receptor_type": receptor_analysis.nearest_water_body.receptor_type,
+                "receptor_id": receptor_analysis.nearest_water_body.receptor_id,
+                "receptor_name": receptor_analysis.nearest_water_body.receptor_name,
+                "distance_km": receptor_analysis.nearest_water_body.distance_km,
+            }
+            if receptor_analysis.nearest_water_body
+            else None
+        ),
+        "total_receptors_found": len(receptor_analysis.all_receptors),
+    }
+    gis.save_summary([receptor_summary], "receptor_distances.json")
+
+    # Advanced Environmental KPIs
+    logger.info("Calculating advanced environmental KPIs...")
+    environmental_kpis = calculate_comprehensive_kpis(
+        aoi=aoi,
+        land_cover_gdf=corine_clip,
+        land_cover_summary=land_cover_summary,
+        protected_areas=natura_clip if not natura_clip.empty else gpd.GeoDataFrame(geometry=[], crs=aoi.crs),
+        emission_result=emission_result.as_dict(),
+        project_capacity_mw=project_params.get("capacity_mw", 0) or 0.0,
+    )
+    gis.save_summary([environmental_kpis.as_dict()], "environmental_kpis.json")
+
     manifest = {
         "run_id": run_id,
         "project_id": run_config.get("project_id"),
@@ -196,6 +256,14 @@ def main() -> None:
                 ),
                 "emissions": str(
                     (run_dir / settings.processed_dir_name / "emissions_summary.json")
+                    .relative_to(run_dir)
+                ),
+                "receptor_distances": str(
+                    (run_dir / settings.processed_dir_name / "receptor_distances.json")
+                    .relative_to(run_dir)
+                ),
+                "environmental_kpis": str(
+                    (run_dir / settings.processed_dir_name / "environmental_kpis.json")
                     .relative_to(run_dir)
                 ),
             },

@@ -20,11 +20,13 @@
 - `backend/src/utils/geometry.py`
 - `backend/src/pipeline/geospatial.py`
 
-### Phase 2 – Emissions & Indicators
+### Phase 2 – Emissions & Indicators ✅
 **Goals**
-- Implement `emissions_api.py` with baseline vs project calculations.
-- Define emission factor catalog (YAML/JSON) and override mechanism.
-- Add fragmentation metrics, land cover summaries, and distance-to-receptor calculations.
+- [x] Implement `emissions_api.py` with baseline vs project calculations.
+- [x] Define emission factor catalog (YAML/JSON) and override mechanism.
+- [x] Add fragmentation metrics, land cover summaries, and **distance-to-receptor calculations**.
+- [x] Implement **advanced environmental KPIs** with scientific accuracy (20+ indicators).
+- [x] Create comprehensive **bibliography document** cataloging all scientific sources.
 
 ### Phase 3 – AI/ML Models
 **Goals**

@@ -1,4 +1,4 @@
-from . import biodiversity, cache, countries, projects, runs
+from . import biodiversity, cache, countries, indicators, projects, runs
 
-__all__ = ["biodiversity", "cache", "countries", "projects", "runs"]
+__all__ = ["biodiversity", "cache", "countries", "indicators", "projects", "runs"]
 
