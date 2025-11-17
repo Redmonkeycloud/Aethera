@@ -14,6 +14,8 @@ from .analysis.biodiversity import build_biodiversity_features, compute_overlap_
 from .analysis.land_cover import summarize_land_cover
 from .analysis.receptors import calculate_distance_to_receptors
 from .analysis.kpis import calculate_comprehensive_kpis
+from .analysis.resm_features import build_resm_features
+from .analysis.ahsm_features import build_ahsm_features
 from .config.base_settings import settings
 from .datasets.catalog import DatasetCatalog
 from .db import DatabaseClient, ModelRunLogger, ModelRunRecord
@@ -31,6 +33,9 @@ from ai.models.biodiversity import (  # type: ignore  # noqa: E402
     BiodiversityConfig,
     BiodiversityModel,
 )
+from ai.models.resm import RESMConfig, RESMModel  # type: ignore  # noqa: E402
+from ai.models.ahsm import AHSMConfig, AHSMModel  # type: ignore  # noqa: E402
+from ai.models.cim import CIMConfig, CIMModel  # type: ignore  # noqa: E402
 
 
 logger = get_logger(__name__)
@@ -227,7 +232,8 @@ def main() -> None:
         ),
         "total_receptors_found": len(receptor_analysis.all_receptors),
     }
-    gis.save_summary([receptor_summary], "receptor_distances.json")
+    receptor_summary_list = [receptor_summary]
+    gis.save_summary(receptor_summary_list, "receptor_distances.json")
 
     # Advanced Environmental KPIs
     logger.info("Calculating advanced environmental KPIs...")
@@ -240,6 +246,145 @@ def main() -> None:
         project_capacity_mw=project_params.get("capacity_mw", 0) or 0.0,
     )
     gis.save_summary([environmental_kpis.as_dict()], "environmental_kpis.json")
+
+    # RESM (Renewable/Resilience Suitability Model)
+    logger.info("Running RESM (Renewable/Resilience Suitability Model)...")
+    resm_features = build_resm_features(
+        aoi=aoi,
+        land_cover_summary=land_cover_summary,
+        environmental_kpis=environmental_kpis,
+        receptor_distances=receptor_summary,
+        project_type=args.project_type,
+    )
+    resm_config = RESMConfig()
+    resm_model = RESMModel(config=resm_config)
+    resm_prediction = resm_model.predict(resm_features)
+    gis.save_summary([resm_prediction], "resm_prediction.json")
+
+    # AHSM (Asset Hazard Susceptibility Model)
+    logger.info("Running AHSM (Asset Hazard Susceptibility Model)...")
+    ahsm_features = build_ahsm_features(
+        aoi=aoi,
+        land_cover_summary=land_cover_summary,
+        environmental_kpis=environmental_kpis,
+        receptor_distances=receptor_summary,
+    )
+    ahsm_config = AHSMConfig()
+    ahsm_model = AHSMModel(config=ahsm_config)
+    ahsm_prediction = ahsm_model.predict(ahsm_features)
+    gis.save_summary([ahsm_prediction], "ahsm_prediction.json")
+
+    # CIM (Cumulative Impact Model) - integrates all models
+    logger.info("Running CIM (Cumulative Impact Model)...")
+    cim_features = {
+        "resm_score": resm_prediction["score"],
+        "ahsm_score": ahsm_prediction["score"],
+        "biodiversity_score": biodiversity_prediction["score"],
+        "distance_to_protected_km": (
+            receptor_summary.get("nearest_protected_area", {}).get("distance_km", 999.0)
+            if receptor_summary.get("nearest_protected_area")
+            else 999.0
+        ),
+        "protected_overlap_pct": overlap_metrics.get("protected_overlap_pct", 0.0),
+        "habitat_fragmentation_index": environmental_kpis.habitat_fragmentation_index,
+        "connectivity_index": environmental_kpis.connectivity_index,
+        "ecosystem_service_value": environmental_kpis.ecosystem_service_value_index,
+        "ghg_emissions_intensity": environmental_kpis.ghg_emissions_intensity,
+        "net_carbon_balance": environmental_kpis.net_carbon_balance,
+        "land_use_efficiency": environmental_kpis.land_use_efficiency,
+        "natural_habitat_ratio": environmental_kpis.natural_habitat_ratio,
+        "soil_erosion_risk": environmental_kpis.soil_erosion_risk,
+        "water_regulation_capacity": environmental_kpis.water_regulation_capacity,
+    }
+    cim_config = CIMConfig()
+    cim_model = CIMModel(config=cim_config)
+    cim_prediction = cim_model.predict(cim_features)
+    gis.save_summary([cim_prediction], "cim_prediction.json")
+
+    # Log model metadata to database
+    try:
+        db_client = DatabaseClient(settings.postgres_dsn)
+        model_logger = ModelRunLogger(db_client)
+
+        # Log RESM
+        resm_model_details = resm_prediction.get("model_details", [])
+        resm_candidates = [detail["model"] for detail in resm_model_details]
+        resm_selected = (
+            max(resm_model_details, key=lambda d: d.get("confidence", 0))["model"]
+            if resm_model_details
+            else None
+        )
+        resm_record = ModelRunRecord(
+            run_id=run_id,
+            model_name="resm_ensemble",
+            model_version=resm_config.version,
+            dataset_source=resm_prediction.get("dataset_source"),
+            candidate_models=resm_candidates,
+            selected_model=resm_selected,
+            metrics={
+                "score": resm_prediction.get("score"),
+                "category": resm_prediction.get("category"),
+                "confidence": resm_prediction.get("confidence"),
+                "drivers": resm_prediction.get("drivers"),
+                "model_details": resm_prediction.get("model_details"),
+            },
+        )
+        model_logger.log(resm_record)
+
+        # Log AHSM
+        ahsm_model_details = ahsm_prediction.get("model_details", [])
+        ahsm_candidates = [detail["model"] for detail in ahsm_model_details]
+        ahsm_selected = (
+            max(ahsm_model_details, key=lambda d: d.get("confidence", 0))["model"]
+            if ahsm_model_details
+            else None
+        )
+        ahsm_record = ModelRunRecord(
+            run_id=run_id,
+            model_name="ahsm_ensemble",
+            model_version=ahsm_config.version,
+            dataset_source=ahsm_prediction.get("dataset_source"),
+            candidate_models=ahsm_candidates,
+            selected_model=ahsm_selected,
+            metrics={
+                "score": ahsm_prediction.get("score"),
+                "category": ahsm_prediction.get("category"),
+                "confidence": ahsm_prediction.get("confidence"),
+                "drivers": ahsm_prediction.get("drivers"),
+                "hazard_types": ahsm_prediction.get("hazard_types"),
+                "model_details": ahsm_prediction.get("model_details"),
+            },
+        )
+        model_logger.log(ahsm_record)
+
+        # Log CIM
+        cim_model_details = cim_prediction.get("model_details", [])
+        cim_candidates = [detail["model"] for detail in cim_model_details]
+        cim_selected = (
+            max(cim_model_details, key=lambda d: d.get("confidence", 0))["model"]
+            if cim_model_details
+            else None
+        )
+        cim_record = ModelRunRecord(
+            run_id=run_id,
+            model_name="cim_ensemble",
+            model_version=cim_config.version,
+            dataset_source=cim_prediction.get("dataset_source"),
+            candidate_models=cim_candidates,
+            selected_model=cim_selected,
+            metrics={
+                "score": cim_prediction.get("score"),
+                "category": cim_prediction.get("category"),
+                "confidence": cim_prediction.get("confidence"),
+                "drivers": cim_prediction.get("drivers"),
+                "model_details": cim_prediction.get("model_details"),
+            },
+        )
+        model_logger.log(cim_record)
+
+        logger.info("Logged RESM, AHSM, and CIM model metadata for run %s", run_id)
+    except Exception as exc:
+        logger.warning("Unable to log model metadata: %s", exc)
 
     manifest = {
         "run_id": run_id,
@@ -264,6 +409,18 @@ def main() -> None:
                 ),
                 "environmental_kpis": str(
                     (run_dir / settings.processed_dir_name / "environmental_kpis.json")
+                    .relative_to(run_dir)
+                ),
+                "resm_prediction": str(
+                    (run_dir / settings.processed_dir_name / "resm_prediction.json")
+                    .relative_to(run_dir)
+                ),
+                "ahsm_prediction": str(
+                    (run_dir / settings.processed_dir_name / "ahsm_prediction.json")
+                    .relative_to(run_dir)
+                ),
+                "cim_prediction": str(
+                    (run_dir / settings.processed_dir_name / "cim_prediction.json")
                     .relative_to(run_dir)
                 ),
             },

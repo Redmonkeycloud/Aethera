@@ -28,12 +28,17 @@
 - [x] Implement **advanced environmental KPIs** with scientific accuracy (20+ indicators).
 - [x] Create comprehensive **bibliography document** cataloging all scientific sources.
 
-### Phase 3 – AI/ML Models
+### Phase 3 – AI/ML Models ✅ (80% Complete)
 **Goals**
-- Finalize config schema for RESM/AHSM/CIM and mandatory Biodiversity AI, each supporting multiple candidate models per run.
-- Build data preprocessing pipeline to convert geospatial outputs into training tensors; enable ingestion of real training datasets (e.g., `data2/biodiversity/*.parquet`) and fall back to synthetic samples only when needed.
-- Train baseline models using historical/global datasets; log runs via MLflow/W&B and store metrics in `model_runs`.
-- Implement inference services that execute all configured models, evaluate projections, and select/blend the best outputs (stacking/ensemble selection) before persisting to run results.
+- [x] Finalize config schema for RESM/AHSM/CIM and mandatory Biodiversity AI, each supporting multiple candidate models per run.
+- [x] Build data preprocessing pipeline to convert geospatial outputs into training tensors; enable ingestion of real training datasets (e.g., `data2/biodiversity/*.parquet`) and fall back to synthetic samples only when needed.
+- [x] Train baseline models using synthetic datasets; log runs and store metrics in `model_runs`.
+- [x] Implement inference services that execute all configured models, evaluate projections, and select/blend the best outputs (ensemble averaging) before persisting to run results.
+- [x] **RESM Implementation**: Renewable energy suitability assessment with ensemble regression models
+- [x] **AHSM Implementation**: Hazard susceptibility assessment with ensemble classification models
+- [x] **CIM Implementation**: Cumulative impact model integrating all other models
+- [ ] MLflow/W&B integration - **NOT STARTED**
+- [ ] Advanced ensemble selection (stacking, blending) - **BASIC (averaging only)**
 
 ### Phase 4 – Biodiversity AI & Legal Rules Engine
 **Goals**
