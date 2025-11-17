@@ -18,10 +18,49 @@ class GISHandler:
     def __init__(self, output_dir: Path) -> None:
         self.output_dir = output_dir
 
-    def clip_vector(self, dataset_path: Path, aoi: GeoDataFrame, output_name: str) -> GeoDataFrame:
+    def clip_vector(
+        self,
+        dataset_path: Path,
+        aoi: GeoDataFrame,
+        output_name: str,
+        use_cache: bool = True,
+    ) -> GeoDataFrame:
+        """
+        Clip a vector dataset to the AOI.
+
+        Args:
+            dataset_path: Path to the dataset file
+            aoi: Area of interest GeoDataFrame
+            output_name: Name for the output file
+            use_cache: Whether to use dataset cache if available
+
+        Returns:
+            Clipped GeoDataFrame
+        """
         logger.info("Clipping dataset %s", dataset_path)
         bbox = tuple(aoi.total_bounds.tolist())
-        gdf = gpd.read_file(dataset_path, bbox=bbox)
+
+        # Try to use cache if available and enabled
+        if use_cache:
+            from ..datasets.catalog import DatasetCatalog
+            from ..config.base_settings import settings
+
+            catalog = DatasetCatalog(settings.data_sources_dir)
+            if catalog.cache:
+                try:
+                    # Generate a cache key that includes bbox
+                    gdf = catalog.cache.get(
+                        dataset_path,
+                        lambda p, **kw: gpd.read_file(p, bbox=bbox),
+                        bbox=bbox,
+                    )
+                except Exception as exc:
+                    logger.warning("Cache load failed, falling back to direct read: %s", exc)
+                    gdf = gpd.read_file(dataset_path, bbox=bbox)
+            else:
+                gdf = gpd.read_file(dataset_path, bbox=bbox)
+        else:
+            gdf = gpd.read_file(dataset_path, bbox=bbox)
         if gdf.empty:
             logger.warning("Dataset %s returned no features within AOI bbox.", dataset_path)
             return gdf

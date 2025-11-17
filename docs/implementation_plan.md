@@ -7,13 +7,13 @@
 - [x] Provision Postgres/PostGIS + pgvector extensions (via Docker compose) and create `reports_history`, `report_embeddings`, and `model_runs` tables.
 - [x] Prepare data ingestion scripts: `scripts/fetch_external_biodiversity_sources.py` (OWID + GBIF) and `scripts/build_biodiversity_training.py` (Natura + CORINE derived training set).
 
-### Phase 1 – Core Geospatial Pipeline
+### Phase 1 – Core Geospatial Pipeline ✅
 **Goals**
-- Implement `main_controller` orchestration CLI.
-- Build AOI loader/validator supporting shapefile, GeoJSON, WKT, and CRS normalization.
-- Implement dataset connectors (CORINE, GADM, Natural Earth, Natura) with caching.
-- Develop clipping, buffering, intersection, and zonal statistics utilities.
-- Persist processed layers under `/data/processed/<run_id>/`.
+- [x] Implement `main_controller` orchestration CLI.
+- [x] Build AOI loader/validator supporting shapefile, GeoJSON, **WKT (strings and files)**, and CRS normalization.
+- [x] Implement dataset connectors (CORINE, GADM, Natural Earth, Natura) with **comprehensive caching mechanism**.
+- [x] Develop clipping, buffering, intersection, and zonal statistics utilities.
+- [x] Persist processed layers under `/data/processed/<run_id>/`.
 
 **Python Modules**
 - `backend/src/datasets/corine.py`
