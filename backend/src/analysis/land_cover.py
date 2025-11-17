@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Dict
-
 import geopandas as gpd
 
 
@@ -20,7 +18,7 @@ CLASS_FIELDS = [
 ]
 
 
-def summarize_land_cover(gdf: gpd.GeoDataFrame) -> List[Dict]:
+def summarize_land_cover(gdf: gpd.GeoDataFrame) -> list[dict]:
     if gdf.empty:
         return []
 

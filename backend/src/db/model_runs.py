@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
-from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from .client import DatabaseClient
@@ -18,11 +17,11 @@ class ModelRunRecord:
     run_id: str
     model_name: str
     model_version: str
-    dataset_source: Optional[str]
-    candidate_models: Optional[list[str]]
-    selected_model: Optional[str]
-    metrics: Dict[str, Any]
-    created_at: datetime = datetime.utcnow()
+    dataset_source: str | None
+    candidate_models: list[str] | None
+    selected_model: str | None
+    metrics: dict[str, Any]
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     id: str = ""
 
     def as_db_tuple(self) -> tuple:

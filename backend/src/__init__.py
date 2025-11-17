@@ -1,6 +1,8 @@
 """Backend package for AETHERA."""
 
-from importlib.metadata import version, PackageNotFoundError
+from __future__ import annotations
+
+from importlib.metadata import PackageNotFoundError, version
 
 
 def get_version() -> str:

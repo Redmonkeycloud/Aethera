@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from ...config.base_settings import settings
 from ..models import Project, ProjectCreate
 from ..storage import ProjectStore
-from ...config.base_settings import settings
 
 
 router = APIRouter()

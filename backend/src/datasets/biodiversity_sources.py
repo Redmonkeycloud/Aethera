@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 
 @dataclass(frozen=True)
@@ -12,7 +11,7 @@ class VettedDataset:
     license: str
 
 
-VETTED_DATASETS: List[VettedDataset] = [
+VETTED_DATASETS: list[VettedDataset] = [
     VettedDataset(
         name="Natura 2000 (EEA)",
         url="https://sdi.eea.europa.eu/catalogue/srv/api/records/f5b78e1b-4a50-4f59-8956-321cce0ed0e5/download",

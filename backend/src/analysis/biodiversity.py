@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, List
-
 import geopandas as gpd
 
 FOREST_CLASSES = {"311", "312", "313"}
@@ -11,7 +9,7 @@ FOREST_CLASSES = {"311", "312", "313"}
 
 def compute_overlap_metrics(
     aoi: gpd.GeoDataFrame, protected_areas: gpd.GeoDataFrame
-) -> Tuple[Dict[str, float], gpd.GeoDataFrame]:
+) -> tuple[dict[str, float], gpd.GeoDataFrame]:
     """Return area/percentage overlap metrics and the overlapping GeoDataFrame."""
     if protected_areas.empty:
         return {
@@ -48,7 +46,7 @@ def compute_overlap_metrics(
     }, overlap
 
 
-def forest_ratio(land_cover_summary: List[Dict]) -> float:
+def forest_ratio(land_cover_summary: list[dict]) -> float:
     total_area = sum(float(row.get("total_area_ha", 0)) for row in land_cover_summary)
     if total_area <= 0:
         return 0.0
@@ -62,9 +60,9 @@ def forest_ratio(land_cover_summary: List[Dict]) -> float:
 
 def build_biodiversity_features(
     aoi: gpd.GeoDataFrame,
-    land_cover_summary: List[Dict],
-    overlap_metrics: Dict[str, float],
-) -> Dict[str, float]:
+    land_cover_summary: list[dict],
+    overlap_metrics: dict[str, float],
+) -> dict[str, float]:
     aoi_area_ha = aoi.geometry.area.sum() / 10_000
     features = {
         "aoi_area_ha": aoi_area_ha,
