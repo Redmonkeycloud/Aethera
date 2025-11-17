@@ -185,12 +185,32 @@ See `DEVELOPMENT.md` for detailed development guide.
 - **Phase 0 (Foundation & Infrastructure)**: CI/CD pipeline, development environment standardization
 - **Phase 1 (Core Geospatial Pipeline)**: WKT support, comprehensive dataset caching mechanism
 - **Phase 2 (Emissions & Indicators)**: Distance-to-receptor calculations, advanced environmental KPIs (20+ indicators)
-- **Phase 3 (AI/ML Models)**: RESM, AHSM, CIM, and Biodiversity AI fully implemented with ensemble ML approaches
+- **Phase 3 (AI/ML Models)**: RESM, AHSM, CIM, and Biodiversity AI fully implemented with ensemble ML approaches, training pipelines, and MLflow/W&B integration
 
 **🚧 In Progress:**
 - Legal Rules Engine (Phase 4)
 - Async processing with Celery (Phase 5)
 - Report generation integration (Phase 7)
+
+### Training Models
+
+Train individual models or all models at once:
+
+```bash
+# Train individual model
+python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
+
+# Train all models
+python -m ai.training.train_all --training-data-dir data2
+
+# With MLflow tracking (default)
+python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
+
+# With Weights & Biases
+python -m ai.training.train_biodiversity --wandb --training-data data2/biodiversity/training.csv
+```
+
+See `docs/MLFLOW_WANDB_SETUP.md` for detailed setup instructions.
 
 ### Next Steps
 - Design and implement the legal rules DSL and prototype a single-country ruleset.

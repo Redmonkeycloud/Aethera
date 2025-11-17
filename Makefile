@@ -56,3 +56,21 @@ db-reset: docker-down docker-up ## Reset database (stop, start, init)
 
 setup: install-dev db-init ## Complete setup (install dev deps + init DB)
 
+train-biodiversity: ## Train Biodiversity AI model
+	python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
+
+train-resm: ## Train RESM model
+	python -m ai.training.train_resm
+
+train-ahsm: ## Train AHSM model
+	python -m ai.training.train_ahsm
+
+train-cim: ## Train CIM model
+	python -m ai.training.train_cim
+
+train-all: ## Train all models
+	python -m ai.training.train_all --training-data-dir data2
+
+mlflow-ui: ## Start MLflow UI
+	mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns
+

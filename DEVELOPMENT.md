@@ -200,6 +200,23 @@ cd scripts
 python run_country_analysis.py ITA --project-type solar_farm
 ```
 
+**Train AI/ML models:**
+```bash
+# Train individual model
+python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
+
+# Train all models
+python -m ai.training.train_all --training-data-dir data2
+
+# With MLflow tracking (default)
+python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
+
+# With Weights & Biases
+python -m ai.training.train_biodiversity --wandb --training-data data2/biodiversity/training.csv
+```
+
+See `docs/MLFLOW_WANDB_SETUP.md` for detailed setup instructions.
+
 ## Project Structure
 
 ```
