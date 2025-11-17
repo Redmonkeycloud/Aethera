@@ -64,21 +64,32 @@ def build_training_dataframe(sample_count: int, seed: int) -> pd.DataFrame:
     natura = load_datasets()
     sindex = natura.sindex
     collected: List[dict] = []
+    
+    # Get bounding box of natura data for sampling
+    natura_bounds = natura.total_bounds
 
-    for _ in range(sample_count * 2):
-        row = natura.sample(1).iloc[0]
-        centroid = row.geometry.representative_point()
-        offset_x = random.uniform(-5000, 5000)
-        offset_y = random.uniform(-5000, 5000)
-        point = Point(centroid.x + offset_x, centroid.y + offset_y)
+    for i in range(sample_count * 3):
+        # Mix sampling strategies: 50% near Natura sites, 50% random
+        if i % 2 == 0 and len(natura) > 0:
+            # Sample near Natura site
+            row = natura.sample(1).iloc[0]
+            centroid = row.geometry.representative_point()
+            offset_x = random.uniform(-10000, 10000)
+            offset_y = random.uniform(-10000, 10000)
+            point = Point(centroid.x + offset_x, centroid.y + offset_y)
+        else:
+            # Random sample within bounds
+            point = Point(
+                random.uniform(natura_bounds[0], natura_bounds[2]),
+                random.uniform(natura_bounds[1], natura_bounds[3])
+            )
+        
         radius_km = random.uniform(2, 20)
         aoi_geom = point.buffer(radius_km * 1000)
-        aoi = gpd.GeoDataFrame({"id": [row.SITECODE]}, geometry=[aoi_geom], crs=TARGET_CRS)
+        aoi = gpd.GeoDataFrame({"id": [f"sample_{i}"]}, geometry=[aoi_geom], crs=TARGET_CRS)
 
         hits = list(sindex.query(aoi_geom, predicate="intersects"))
-        if not hits:
-            continue
-        subset = natura.iloc[hits]
+        subset = natura.iloc[hits] if hits else gpd.GeoDataFrame(geometry=[], crs=TARGET_CRS)
 
         corine_clip = clip_corine(aoi)
         if corine_clip.empty:
@@ -87,9 +98,9 @@ def build_training_dataframe(sample_count: int, seed: int) -> pd.DataFrame:
         land_cover_summary = summarize_land_cover(corine_clip)
         overlap_metrics, _ = compute_overlap_metrics(aoi, subset)
         features = build_biodiversity_features(aoi, land_cover_summary, overlap_metrics)
-        features["sitecode"] = row.SITECODE
-        features["sitename"] = row.SITENAME
-        features["sitetype"] = row.SITETYPE
+        features["sitecode"] = row.SITECODE if hits and len(natura) > 0 else None
+        features["sitename"] = row.SITENAME if hits and len(natura) > 0 else None
+        features["sitetype"] = row.SITETYPE if hits and len(natura) > 0 else None
         features["label"] = classify_label(features)
         collected.append(features)
 

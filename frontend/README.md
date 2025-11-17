@@ -1,21 +1,51 @@
-# AETHERA Frontend (Placeholder)
+# AETHERA Frontend
 
-This directory will host the React + TypeScript + MapLibre application for project creation, AOI upload/drawing, scenario management, interactive geospatial visualization, indicator dashboards, and export tools.
+A simple web interface for visualizing biodiversity analysis results from AETHERA.
 
-Planned stack:
-- Vite + React 19 + TypeScript
-- MapLibre GL JS + Deck.GL
-- Tailwind CSS + Radix UI
-- Zustand/Redux Toolkit for state
-- TanStack Query for API calls
+## Features
 
-### Backend endpoints already available
-- `GET /projects` / `POST /projects` – manage lightweight project records.
-- `GET /runs` – enumerate completed processing runs.
-- `GET /runs/{run_id}` – retrieve run metadata plus relative URLs for GeoJSON layers (e.g., `/runs/{run_id}/biodiversity/sensitivity`).
-- `GET /runs/{run_id}/biodiversity/{layer}` – download the GeoJSON for `sensitivity`, `natura`, or `overlap`.
+- Interactive map visualization using Leaflet
+- Display biodiversity sensitivity layers
+- View Natura 2000 protected sites
+- Show overlap areas between AOI and protected sites
+- Toggle layers on/off
+- Popup information on feature click
 
-The map components should request these endpoints to populate the layer list and fetch the GeoJSON for rendering.
+## Usage
 
-Setup instructions will be added once the frontend scaffold is generated.
+1. **Start the backend API server:**
+   ```bash
+   cd backend
+   python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+   ```
 
+2. **Open the frontend:**
+   - Simply open `index.html` in a web browser
+   - Or serve it with a simple HTTP server:
+     ```bash
+     # Python
+     python -m http.server 8080
+     
+     # Node.js
+     npx serve
+     ```
+
+3. **Load a run:**
+   - Enter a Run ID (e.g., `run_20251117_132207`) in the sidebar
+   - Click "Load Biodiversity Layers"
+   - Toggle layers on/off using the checkboxes
+
+## API Endpoints Used
+
+- `GET /runs/{run_id}/biodiversity/sensitivity` - Biodiversity sensitivity GeoJSON
+- `GET /runs/{run_id}/biodiversity/natura` - Natura 2000 sites GeoJSON
+- `GET /runs/{run_id}/biodiversity/overlap` - Overlap areas GeoJSON
+
+## Future Enhancements
+
+- [ ] Run creation form
+- [ ] AOI upload interface
+- [ ] Real-time analysis status
+- [ ] Report generation preview
+- [ ] Multiple run comparison
+- [ ] Export functionality

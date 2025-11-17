@@ -3,9 +3,9 @@ name = "aethera-backend"
 version = "0.1.0"
 description = "Core backend, geospatial engine, emissions, and orchestration for AETHERA."
 authors = [{name = "AETHERA Team"}]
-readme = "../README.md"
+readme = "README.md"
 license = {text = "Proprietary"}
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",

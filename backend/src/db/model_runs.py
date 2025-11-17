@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from psycopg import sql
+from psycopg.types.json import Jsonb
 
 from .client import DatabaseClient
 
@@ -52,5 +53,9 @@ class ModelRunLogger:
     def log(self, record: ModelRunRecord) -> None:
         with self.client.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(self.INSERT_QUERY, record.as_db_tuple())
+                # Convert metrics dict to Jsonb for proper JSONB insertion
+                values = list(record.as_db_tuple())
+                # Replace metrics (index 7) with Jsonb wrapper
+                values[7] = Jsonb(values[7])
+                cur.execute(self.INSERT_QUERY, tuple(values))
 
