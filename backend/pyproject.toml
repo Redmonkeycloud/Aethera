@@ -58,6 +58,21 @@ build-backend = "setuptools.build_meta"
 select = ["E", "F", "I", "UP", "B", "PL", "RUF"]
 line-length = 100
 target-version = "py311"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.11"
