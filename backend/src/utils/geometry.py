@@ -7,9 +7,23 @@ from pathlib import Path
 
 import geopandas as gpd
 from shapely import wkt
+from shapely.geometry import (
+    GeometryCollection,
+    MultiLineString,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
+
+from ..logging_utils import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def _load_vector(path: Path) -> gpd.GeoDataFrame:
+    """Load a vector file (GeoJSON, Shapefile, GeoPackage, etc.)."""
     if not path.exists():
         raise FileNotFoundError(f"AOI file not found: {path}")
     gdf = gpd.read_file(path)
@@ -20,18 +34,162 @@ def _load_vector(path: Path) -> gpd.GeoDataFrame:
     return gdf
 
 
-def _load_wkt(text: str) -> gpd.GeoDataFrame:
-    geometry = wkt.loads(text)
-    gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[geometry], crs="EPSG:4326")
+def _load_wkt_string(text: str) -> gpd.GeoDataFrame:
+    """
+    Load WKT (Well-Known Text) string into a GeoDataFrame.
+
+    Supports:
+    - Single geometries: POINT, LINESTRING, POLYGON
+    - Multi geometries: MULTIPOINT, MULTILINESTRING, MULTIPOLYGON
+    - Geometry collections: GEOMETRYCOLLECTION
+
+    Args:
+        text: WKT string
+
+    Returns:
+        GeoDataFrame with geometries
+    """
+    try:
+        geometry = wkt.loads(text.strip())
+    except Exception as e:
+        raise ValueError(f"Invalid WKT format: {e}") from e
+
+    if geometry is None:
+        raise ValueError("WKT string resulted in None geometry")
+
+    # Handle different geometry types
+    geometries = []
+    ids = []
+
+    if isinstance(geometry, GeometryCollection):
+        # Extract all geometries from collection
+        for idx, geom in enumerate(geometry.geoms):
+            if geom is not None and not geom.is_empty:
+                geometries.append(geom)
+                ids.append(idx)
+    elif isinstance(
+        geometry, (MultiPoint, MultiLineString, MultiPolygon)
+    ):
+        # Extract individual geometries from multi-geometry
+        for idx, geom in enumerate(geometry.geoms):
+            if geom is not None and not geom.is_empty:
+                geometries.append(geom)
+                ids.append(idx)
+    elif isinstance(geometry, (Point, Polygon)) or hasattr(geometry, "geom_type"):
+        # Single geometry
+        if not geometry.is_empty:
+            geometries.append(geometry)
+            ids.append(0)
+    else:
+        raise ValueError(f"Unsupported geometry type: {type(geometry)}")
+
+    if not geometries:
+        raise ValueError("WKT string contains no valid geometries")
+
+    gdf = gpd.GeoDataFrame({"id": ids}, geometry=geometries, crs="EPSG:4326")
+    logger.info("Loaded %d geometry(ies) from WKT string", len(gdf))
     return gdf
 
 
+def _load_wkt_file(path: Path) -> gpd.GeoDataFrame:
+    """
+    Load WKT from a file.
+
+    Supports:
+    - Single WKT string per line
+    - Multiple geometries (one per line)
+
+    Args:
+        path: Path to WKT file
+
+    Returns:
+        GeoDataFrame with geometries
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"WKT file not found: {path}")
+
+    geometries = []
+    ids = []
+
+    with open(path, encoding="utf-8") as f:
+        for line_num, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            try:
+                geom = wkt.loads(line)
+                if geom is not None and not geom.is_empty:
+                    geometries.append(geom)
+                    ids.append(line_num)
+            except Exception as e:
+                logger.warning(
+                    "Skipping invalid WKT on line %d: %s", line_num, e
+                )
+                continue
+
+    if not geometries:
+        raise ValueError(f"WKT file {path} contains no valid geometries")
+
+    gdf = gpd.GeoDataFrame({"id": ids}, geometry=geometries, crs="EPSG:4326")
+    logger.info("Loaded %d geometry(ies) from WKT file %s", len(gdf), path.name)
+    return gdf
+
+
+def _is_wkt_string(text: str) -> bool:
+    """Check if a string looks like WKT."""
+    text = text.strip().upper()
+    wkt_types = [
+        "POINT",
+        "LINESTRING",
+        "POLYGON",
+        "MULTIPOINT",
+        "MULTILINESTRING",
+        "MULTIPOLYGON",
+        "GEOMETRYCOLLECTION",
+    ]
+    return any(text.startswith(wkt_type) for wkt_type in wkt_types)
+
+
 def load_aoi(aoi_input: str, target_crs: str) -> gpd.GeoDataFrame:
+    """
+    Load an AOI from various input formats.
+
+    Supports:
+    - Vector files: GeoJSON, Shapefile, GeoPackage, etc.
+    - WKT strings: Direct WKT text
+    - WKT files: Files containing WKT (.wkt, .txt with WKT content)
+
+    Args:
+        aoi_input: Path to file or WKT string
+        target_crs: Target CRS for the output (e.g., "EPSG:3035")
+
+    Returns:
+        GeoDataFrame in target CRS
+    """
     path = Path(aoi_input)
+
+    # Check if it's a file path
     if path.exists():
-        gdf = _load_vector(path)
+        # Check if it's a WKT file
+        if path.suffix.lower() in (".wkt", ".txt"):
+            # Try to read as WKT file
+            try:
+                gdf = _load_wkt_file(path)
+            except Exception:
+                # Fall back to regular vector file loading
+                gdf = _load_vector(path)
+        else:
+            # Regular vector file
+            gdf = _load_vector(path)
+    elif _is_wkt_string(aoi_input):
+        # WKT string
+        gdf = _load_wkt_string(aoi_input)
     else:
-        gdf = _load_wkt(aoi_input)
+        # Try as file path that doesn't exist, or invalid input
+        raise FileNotFoundError(
+            f"AOI input not found as file and doesn't appear to be WKT: {aoi_input}"
+        )
 
     gdf = gdf.explode(index_parts=False).reset_index(drop=True)
     gdf = gdf.to_crs(target_crs)

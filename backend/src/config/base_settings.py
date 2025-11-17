@@ -23,6 +23,12 @@ class AppSettings(BaseSettings):
     )
     redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
 
+    # Dataset cache settings
+    dataset_cache_enabled: bool = Field(True, alias="DATASET_CACHE_ENABLED")
+    dataset_cache_dir: Path = Field(Path("../data/cache"), alias="DATASET_CACHE_DIR")
+    dataset_cache_max_mb: int = Field(500, alias="DATASET_CACHE_MAX_MB")
+    dataset_cache_ttl_hours: int = Field(24, alias="DATASET_CACHE_TTL_HOURS")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
