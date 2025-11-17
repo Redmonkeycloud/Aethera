@@ -1,0 +1,22 @@
+model:
+  name: AHSM
+  version: 0.1.0
+  hazards:
+    - flood
+    - wildfire
+    - landslide
+    - coastal_erosion
+  candidates:
+    - random_forest
+    - gradient_boosting
+    - xgboost
+    - neural_net
+training:
+  n_estimators: 300
+  max_depth: 12
+  min_samples_leaf: 5
+  random_state: 1337
+data:
+  processed_dir: ../data/processed
+  label_column: hazard_risk
+
