@@ -54,10 +54,29 @@ This was automatically generated when we ran the test analysis. Each time you ru
 
 ## API Endpoints
 
+### Core Endpoints
 - `GET /countries` - List available countries
 - `GET /countries/{code}/bounds` - Get country bounding box
 - `GET /runs` - List all analysis runs
-- `GET /runs/{run_id}/biodiversity/{layer}` - Get biodiversity layer GeoJSON
+- `GET /runs/{run_id}` - Get run details
+
+### Biodiversity Layers
+- `GET /runs/{run_id}/biodiversity/sensitivity` - Biodiversity sensitivity map
+- `GET /runs/{run_id}/biodiversity/natura` - Natura 2000 protected areas
+- `GET /runs/{run_id}/biodiversity/overlap` - Overlap between AOI and protected areas
+
+### Environmental Indicators
+- `GET /runs/{run_id}/indicators/receptor-distances` - Distance to sensitive receptors
+- `GET /runs/{run_id}/indicators/kpis` - Comprehensive environmental KPIs (20+ indicators)
+
+### AI/ML Model Predictions
+- `GET /runs/{run_id}/indicators/resm` - RESM (Renewable Suitability) predictions
+- `GET /runs/{run_id}/indicators/ahsm` - AHSM (Hazard Susceptibility) predictions
+- `GET /runs/{run_id}/indicators/cim` - CIM (Cumulative Impact) predictions
+
+### Cache Management
+- `GET /cache/stats` - Dataset cache statistics
+- `POST /cache/clear` - Clear the dataset cache
 
 ## Troubleshooting
 
@@ -78,10 +97,28 @@ This was automatically generated when we ran the test analysis. Each time you ru
   python -m src.main_controller --aoi ../test_aoi.geojson --project-type solar_farm
   ```
 
+## What's New
+
+### Phase 1 Complete ✅
+- **WKT Support**: Full support for Well-Known Text strings and files
+- **Dataset Caching**: In-memory and disk-based caching for faster repeated analyses
+
+### Phase 2 Complete ✅
+- **Distance-to-Receptor**: Calculates distances to protected areas, settlements, and water bodies
+- **Advanced Environmental KPIs**: 20+ scientifically-accurate indicators with bibliography
+
+### Phase 3 Complete ✅
+- **RESM Model**: Renewable energy suitability assessment (0-100 score)
+- **AHSM Model**: Multi-hazard susceptibility assessment (flood, wildfire, landslide)
+- **CIM Model**: Cumulative impact model integrating all other models
+- **All models**: Support external training data with synthetic fallback
+
 ## Next Steps
 
 - Create new analyses for different countries
-- Upload custom AOI files
+- Upload custom AOI files (GeoJSON, Shapefile, or WKT)
 - Generate reports from analysis results
 - Add more countries to the GADM dataset
+- Explore model predictions via API endpoints
+- Use cache management for performance optimization
 
