@@ -2,8 +2,8 @@
 
 ### Phase 0 – Foundation (Now)
 - [x] Create repository structure, high-level documentation, and configuration placeholders.
-- [ ] Establish shared development environment (Python 3.11, uv/pip, Node 20, pnpm).
-- [ ] Set up CI (GitHub Actions) to lint Python (ruff, mypy) and TypeScript (eslint).
+- [x] Establish shared development environment (Python 3.11, uv/pip, Node 20, pnpm).
+- [x] Set up CI (GitHub Actions) to lint Python (ruff, mypy) and TypeScript (eslint).
 - [x] Provision Postgres/PostGIS + pgvector extensions (via Docker compose) and create `reports_history`, `report_embeddings`, and `model_runs` tables.
 - [x] Prepare data ingestion scripts: `scripts/fetch_external_biodiversity_sources.py` (OWID + GBIF) and `scripts/build_biodiversity_training.py` (Natura + CORINE derived training set).
 

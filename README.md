@@ -91,42 +91,86 @@ AETHERA_2.0/
 Only placeholder files are committed so far; each component will be expanded iteratively. The backend already anticipates report-learning storage (history tables + embeddings) even though no past reports exist yet.
 
 ### Getting Started
+
+#### Quick Setup (Automated)
+
+**Linux/macOS:**
+```bash
+chmod +x scripts/setup_dev_env.sh
+./scripts/setup_dev_env.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\scripts\setup_dev_env.ps1
+```
+
+#### Manual Setup
+
 1. **Python environment**
-   ```
+   ```bash
+   # Using venv
+   python3.11 -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   
+   # Or using uv (faster)
    cd backend
-   uv venv .venv && .venv/Scripts/activate
-   uv pip install -e .
+   uv venv .venv && source .venv/bin/activate
+   uv pip install -e ".[dev]"
    ```
-2. **Run CLI scaffold**
+
+2. **Install pre-commit hooks** (optional but recommended)
+   ```bash
+   pip install pre-commit
+   pre-commit install
    ```
-   python -m src.main_controller --help
-   ```
+
 3. **Database (Docker)**
-   ```
-   docker compose up -d db
-   python -m backend.src.db.init_db --dsn postgresql://aethera:aethera@localhost:55432/aethera
+   ```bash
+   docker compose up -d
+   cd backend
+   python -m src.db.init_db
    ```
    Requires Docker Desktop + image build from `docker/postgres/Dockerfile` (PostGIS + pgvector). Update `.env` or `env.example` as needed.
+
 4. **Training data + external sources**
-   ```
+   ```bash
    python scripts/fetch_external_biodiversity_sources.py
    python scripts/build_biodiversity_training.py --samples 150
    ```
    The first command fetches OWID and GBIF datasets into `data2/biodiversity/external/`. The second command generates `data2/biodiversity/training.csv` derived from Natura 2000 + CORINE intersections.
+
 5. **API preview**
-   ```
-   uvicorn backend.src.api.app:app --reload
+   ```bash
+   cd backend
+   uvicorn src.api.app:app --reload
    ```
    - `POST /projects` – create a project record (stored in `data/projects.json`).
    - `GET /projects` – list projects.
    - `GET /runs` – list completed runs via `manifest.json` files.
    - `GET /runs/{run_id}/biodiversity/{layer}` – download GeoJSON layers (`sensitivity`, `natura`, `overlap`) for map rendering.
+
 6. **Frontend (later)**
-   ```
+   ```bash
    cd frontend
    pnpm install
    pnpm dev
    ```
+
+#### Using Make (Linux/macOS)
+
+For convenience, use the Makefile:
+
+```bash
+make install-dev    # Install development dependencies
+make docker-up      # Start Docker services
+make db-init        # Initialize database
+make test           # Run tests
+make lint           # Run linting
+make format         # Format code
+```
+
+See `DEVELOPMENT.md` for detailed development guide.
 
 ### Next Steps
 - Flesh out `main_controller` orchestration (dataset download, AOI validation, CORINE clipping).
