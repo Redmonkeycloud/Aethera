@@ -1,0 +1,24 @@
+model:
+  name: CIM
+  version: 0.1.0
+  objective: multi:softprob
+  candidates:
+    - xgboost
+    - lightgbm
+    - random_forest
+    - neural_net
+inputs:
+  - resm_score
+  - ahsm_score
+  - biodiversity_index
+  - distance_to_protected_area
+  - land_use_change
+training:
+  n_estimators: 400
+  max_depth: 6
+  subsample: 0.8
+  colsample_bytree: 0.9
+data:
+  processed_dir: ../data/processed
+  label_column: cumulative_impact_class
+

@@ -1,0 +1,38 @@
+{# Placeholder template for report generation. #}
+# Environmental Impact Assessment – {{ project.name }}
+
+## Executive Summary
+{{ executive_summary }}
+
+## Project Description
+- **Type:** {{ project.type }}
+- **Capacity:** {{ project.capacity_mw }} MW
+- **AOI Area:** {{ indicators.aoi_area_km2 }} km²
+
+## Land Cover Summary
+{% for row in land_cover %}
+- {{ row.class_code }}: {{ "%.2f"|format(row.total_area_ha) }} ha
+{% endfor %}
+
+## Biodiversity Findings
+{{ biodiversity.summary }}
+
+## Emissions
+- Baseline: {{ emissions.baseline_tco2e }} tCO₂e
+- Construction: {{ emissions.project_construction_tco2e }} tCO₂e
+- Operation (annual): {{ emissions.project_operation_tco2e_per_year }} tCO₂e
+- Net difference: {{ emissions.net_difference_tco2e }} tCO₂e
+
+## Hazard & Suitability
+- Suitability: {{ ai.resm.description }}
+- Hazard exposure: {{ ai.ahsm.description }}
+- Cumulative impact: {{ ai.cim.description }}
+
+## Legal & Compliance
+{{ legal_summary }}
+
+## Appendices
+- Data sources
+- Methodologies
+- Run logs
+

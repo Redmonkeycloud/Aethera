@@ -1,0 +1,164 @@
+# Legal Rules for Germany (DEU)
+# EIA-specific regulations and compliance requirements
+
+country_code: DEU
+country_name: Germany
+version: "1.0.0"
+metadata:
+  jurisdiction: "Federal Republic of Germany"
+  applicable_laws:
+    - "Bundesnaturschutzgesetz (BNatSchG)"
+    - "Umweltverträglichkeitsprüfungsgesetz (UVPG)"
+    - "FFH-Richtlinie (Natura 2000)"
+  last_updated: "2025-01-01"
+  sources:
+    - "Bundesnaturschutzgesetz (BNatSchG)"
+    - "Umweltverträglichkeitsprüfungsgesetz (UVPG)"
+    - "Klimaschutzgesetz"
+    - "Wasserhaushaltsgesetz (WHG)"
+    - "Directive 2014/52/EU"
+    - "Directive 92/43/CEE (Habitats Directive)"
+    - "Directive 2000/60/EC (Water Framework Directive)"
+
+rules:
+  # Biodiversity & Protected Areas
+  - id: "deu_bio_natura_overlap"
+    name: "Natura 2000 Site Overlap"
+    description: "Projects overlapping Natura 2000 sites require special assessment"
+    category: "biodiversity"
+    severity: "critical"
+    condition:
+      protected_overlap_pct:
+        ">": 0
+    message_template: "Project overlaps {protected_overlap_pct:.2f}% of Natura 2000 site. Critical assessment required."
+    references:
+      - "FFH-Richtlinie Art. 6(3)"
+      - "BNatSchG § 34"
+
+  - id: "deu_bio_protected_distance"
+    name: "Minimum Distance to Protected Areas"
+    description: "Projects within 500m of protected areas require buffer assessment"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      distance_to_protected_km:
+        "<": 0.5
+    message_template: "Project is {distance_to_protected_km:.2f} km from protected area. Buffer zone assessment required."
+    references:
+      - "BNatSchG § 34"
+
+  - id: "deu_bio_sensitivity_high"
+    name: "High Biodiversity Sensitivity"
+    description: "Areas with high biodiversity sensitivity require detailed impact assessment"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      biodiversity_score:
+        ">": 70
+    message_template: "Biodiversity sensitivity score is {biodiversity_score:.1f} (high). Detailed impact assessment required."
+    references:
+      - "UVPG Anlage 1"
+
+  # Emissions & Air Quality
+  - id: "deu_emissions_threshold"
+    name: "GHG Emissions Threshold"
+    description: "Projects exceeding 100,000 tCO2e/year require EIA"
+    category: "emissions"
+    severity: "critical"
+    condition:
+      project_operation_tco2e_per_year:
+        ">": 100000
+    message_template: "Project emissions ({project_operation_tco2e_per_year:.0f} tCO2e/year) exceed threshold. EIA mandatory."
+    references:
+      - "UVPG Anlage 1, Nr. 1.1"
+
+  - id: "deu_emissions_intensity"
+    name: "Emissions Intensity"
+    description: "High emissions intensity requires mitigation measures"
+    category: "emissions"
+    severity: "medium"
+    condition:
+      ghg_emissions_intensity:
+        ">": 500
+    message_template: "Emissions intensity ({ghg_emissions_intensity:.1f} tCO2e/ha) is high. Mitigation measures required."
+    references:
+      - "Klimaschutzgesetz"
+
+  # Land Use & Habitat
+  - id: "deu_land_use_forest"
+    name: "Forest Area Protection"
+    description: "Significant forest area conversion requires compensation"
+    category: "land_use"
+    severity: "high"
+    condition:
+      and:
+        - forest_ratio:
+            ">": 0.3
+        - aoi_area_ha:
+            ">": 10
+    message_template: "Project affects {forest_ratio:.1%} forest cover ({aoi_area_ha:.1f} ha). Compensation required."
+    references:
+      - "BNatSchG § 15"
+
+  - id: "deu_land_use_natural_habitat"
+    name: "Natural Habitat Ratio"
+    description: "High natural habitat ratio indicates sensitive area"
+    category: "land_use"
+    severity: "medium"
+    condition:
+      natural_habitat_ratio:
+        ">": 0.5
+    message_template: "Natural habitat ratio is {natural_habitat_ratio:.1%}. Enhanced protection measures recommended."
+    references:
+      - "BNatSchG § 20"
+
+  # Water & Receptors
+  - id: "deu_water_distance"
+    name: "Water Body Proximity"
+    description: "Projects near water bodies require water quality assessment"
+    category: "water"
+    severity: "high"
+    condition:
+      distance_to_water_km:
+        "<": 0.1
+    message_template: "Project is {distance_to_water_km:.2f} km from water body. Water quality assessment required."
+    references:
+      - "Wasserhaushaltsgesetz (WHG)"
+
+  - id: "deu_settlement_distance"
+    name: "Settlement Proximity"
+    description: "Projects near settlements require noise and air quality assessment"
+    category: "receptors"
+    severity: "medium"
+    condition:
+      distance_to_settlement_km:
+        "<": 1.0
+    message_template: "Project is {distance_to_settlement_km:.2f} km from settlement. Noise and air quality assessment required."
+    references:
+      - "BImSchG (Federal Immission Control Act)"
+
+  # Cumulative Impact
+  - id: "deu_cumulative_impact_high"
+    name: "High Cumulative Impact"
+    description: "High cumulative impact requires comprehensive assessment"
+    category: "cumulative_impact"
+    severity: "critical"
+    condition:
+      cim_score:
+        ">": 75
+    message_template: "Cumulative impact score is {cim_score:.1f} (high). Comprehensive EIA required."
+    references:
+      - "UVPG § 3"
+
+  - id: "deu_hazard_susceptibility"
+    name: "Hazard Susceptibility"
+    description: "High hazard susceptibility requires risk mitigation plan"
+    category: "hazards"
+    severity: "high"
+    condition:
+      ahsm_score:
+        ">": 70
+    message_template: "Hazard susceptibility score is {ahsm_score:.1f} (high). Risk mitigation plan required."
+    references:
+      - "UVPG Anlage 1"
+

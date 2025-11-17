@@ -1,0 +1,276 @@
+"""Cumulative Impact Model (CIM) - integrates RESM, AHSM, and biodiversity scores."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from functools import cached_property
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+
+logger = logging.getLogger(__name__)
+
+# Cumulative impact level labels
+IMPACT_LABELS = ["negligible", "low", "moderate", "high", "very_high"]
+
+
+@dataclass
+class CIMConfig:
+    """Configuration for CIM model."""
+
+    name: str = "cim"
+    version: str = "0.1.0"
+    inputs: list[str] | None = None
+    training_data_path: str | None = None
+
+
+class CIMEnsemble:
+    """Ensemble model for cumulative impact assessment."""
+
+    def __init__(self, config: CIMConfig | None = None) -> None:
+        self.config = config or CIMConfig()
+        self.vector_fields = self.config.inputs or [
+            "resm_score",
+            "ahsm_score",
+            "biodiversity_score",
+            "distance_to_protected_km",
+            "protected_overlap_pct",
+            "habitat_fragmentation_index",
+            "connectivity_index",
+            "ecosystem_service_value",
+            "ghg_emissions_intensity",
+            "net_carbon_balance",
+            "land_use_efficiency",
+            "natural_habitat_ratio",
+            "soil_erosion_risk",
+            "water_regulation_capacity",
+        ]
+        self.training_data_path = (
+            Path(self.config.training_data_path) if self.config.training_data_path else None
+        )
+        self._models = self._train_models()
+
+    @staticmethod
+    def _generate_training_data(n: int = 2500) -> tuple[np.ndarray, np.ndarray]:
+        """Generate synthetic training data for CIM."""
+        rng = np.random.default_rng(42)
+
+        # Generate realistic feature distributions
+        resm_score = rng.uniform(0, 100, size=n)
+        ahsm_score = rng.uniform(0, 100, size=n)
+        biodiversity_score = rng.uniform(0, 100, size=n)
+        distance_to_protected_km = rng.exponential(5, size=n)
+        protected_overlap_pct = rng.uniform(0, 50, size=n)
+        fragmentation_index = rng.uniform(0, 1, size=n)
+        connectivity_index = rng.uniform(0, 1, size=n)
+        ecosystem_service_value = rng.uniform(0, 1, size=n)
+        ghg_intensity = rng.uniform(0, 500, size=n)
+        net_carbon_balance = rng.uniform(-1000, 1000, size=n)
+        land_use_efficiency = rng.uniform(0, 10, size=n)
+        natural_habitat_ratio = rng.uniform(0, 1, size=n)
+        soil_erosion_risk = rng.uniform(0, 1, size=n)
+        water_regulation = rng.uniform(0, 1, size=n)
+
+        X = np.column_stack(
+            [
+                resm_score,
+                ahsm_score,
+                biodiversity_score,
+                distance_to_protected_km,
+                protected_overlap_pct,
+                fragmentation_index,
+                connectivity_index,
+                ecosystem_service_value,
+                ghg_intensity,
+                net_carbon_balance,
+                land_use_efficiency,
+                natural_habitat_ratio,
+                soil_erosion_risk,
+                water_regulation,
+            ]
+        )
+
+        # Cumulative impact: higher when multiple stressors are high
+        impact_score = (
+            (100 - biodiversity_score) * 0.3  # Low biodiversity = high impact
+            + ahsm_score * 0.25  # High hazard risk = high impact
+            + protected_overlap_pct * 0.2  # Protected area overlap = high impact
+            + (1.0 - connectivity_index) * 0.15  # Low connectivity = high impact
+            + fragmentation_index * 0.1  # High fragmentation = impact
+            + (ghg_intensity / 10) * 0.1  # High emissions = impact
+            - (ecosystem_service_value * 20)  # High service value = lower impact
+        )
+
+        # Normalize and categorize
+        impact_score = np.clip(impact_score, 0, 100)
+        bins = [0, 20, 40, 60, 80, 100]
+        y = np.digitize(impact_score, bins) - 1
+
+        return X, y
+
+    def _load_external_training_data(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """Load external training data if available."""
+        if not self.training_data_path:
+            return None
+        path = self.training_data_path
+        if not path.exists():
+            logger.warning("CIM training data path %s not found. Falling back to synthetic data.", path)
+            return None
+        try:
+            if path.suffix == ".parquet":
+                df = pd.read_parquet(path)
+            elif path.suffix in {".csv", ".tsv"}:
+                df = pd.read_csv(path)
+            else:
+                logger.warning("Unsupported CIM training format %s. Falling back to synthetic.", path.suffix)
+                return None
+        except Exception as exc:
+            logger.warning("Failed to load CIM training data: %s", exc)
+            return None
+
+        missing = [col for col in self.vector_fields if col not in df.columns]
+        if missing:
+            logger.warning("Training data missing columns %s. Falling back to synthetic data.", missing)
+            return None
+
+        label_column = None
+        for candidate in ("cumulative_impact_class", "impact_level", "label", "target"):
+            if candidate in df.columns:
+                label_column = candidate
+                break
+
+        if not label_column:
+            logger.warning("Training data lacks label column. Falling back to synthetic data.")
+            return None
+
+        label_map = {label: idx for idx, label in enumerate(IMPACT_LABELS)}
+        if df[label_column].dtype == "object":
+            y = df[label_column].map(label_map).to_numpy()
+        else:
+            y = df[label_column].to_numpy()
+
+        if np.isnan(y).any() or (y < 0).any() or (y >= len(IMPACT_LABELS)).any():
+            logger.warning("Training labels contain invalid values. Falling back to synthetic data.")
+            return None
+
+        X = df[self.vector_fields].to_numpy()
+        return X, y.astype(int)
+
+    def _train_models(self) -> list[tuple[str, Any]]:
+        """Train ensemble of classification models."""
+        external = self._load_external_training_data()
+        if external:
+            X, y = external
+            logger.info("Loaded CIM training data from %s", self.training_data_path)
+            dataset_source = str(self.training_data_path)
+        else:
+            X, y = self._generate_training_data()
+            dataset_source = "synthetic"
+        self.dataset_source = dataset_source
+
+        models: list[tuple[str, Any]] = []
+
+        # Logistic Regression
+        lr_pipeline = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                ("clf", LogisticRegression(max_iter=500, multi_class="multinomial")),
+            ]
+        )
+        lr_pipeline.fit(X, y)
+        models.append(("logistic_regression", lr_pipeline))
+
+        # Random Forest
+        rf = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=7)
+        rf.fit(X, y)
+        models.append(("random_forest", rf))
+
+        # Gradient Boosting
+        gb = GradientBoostingClassifier(
+            n_estimators=200, max_depth=5, learning_rate=0.1, random_state=21
+        )
+        gb.fit(X, y)
+        models.append(("gradient_boosting", gb))
+
+        return models
+
+    def _vectorize(self, features: dict[str, float]) -> np.ndarray:
+        """Convert feature dictionary to vector."""
+        return np.array([float(features.get(field, 0.0)) for field in self.vector_fields])
+
+    def predict(self, features: dict[str, float]) -> dict[str, Any]:
+        """
+        Predict cumulative impact level.
+
+        Returns:
+            Dictionary with impact score (0-100), category, confidence, and model details
+        """
+        x = self._vectorize(features)
+        probabilities: list[np.ndarray] = []
+        details: list[dict[str, Any]] = []
+
+        for name, model in self._models:
+            proba = model.predict_proba([x])[0]
+            probabilities.append(proba)
+            pred_idx = int(np.argmax(proba))
+            details.append(
+                {
+                    "model": name,
+                    "prediction": IMPACT_LABELS[pred_idx],
+                    "confidence": float(proba[pred_idx]),
+                }
+            )
+
+        # Ensemble prediction (average probabilities)
+        avg_prob = np.mean(probabilities, axis=0)
+        final_idx = int(np.argmax(avg_prob))
+        impact_score = float(np.dot(avg_prob, np.array([10, 30, 50, 75, 95])))
+
+        # Key drivers
+        drivers = []
+        if features.get("biodiversity_score", 100) < 40:
+            drivers.append("High biodiversity sensitivity")
+        if features.get("ahsm_score", 0) > 70:
+            drivers.append("High hazard susceptibility")
+        if features.get("protected_overlap_pct", 0) > 10:
+            drivers.append("Significant protected area overlap")
+        if features.get("ghg_emissions_intensity", 0) > 200:
+            drivers.append("High GHG emissions intensity")
+        if features.get("connectivity_index", 1) < 0.3:
+            drivers.append("Low ecological connectivity")
+        if not drivers:
+            drivers.append("Moderate cumulative impact based on multiple factors")
+
+        return {
+            "score": impact_score,
+            "category": IMPACT_LABELS[final_idx],
+            "confidence": float(avg_prob[final_idx]),
+            "model_details": details,
+            "features": features,
+            "drivers": drivers,
+            "dataset_source": getattr(self, "dataset_source", "synthetic"),
+        }
+
+
+class CIMModel:
+    """Main CIM model interface."""
+
+    def __init__(self, config: CIMConfig | None = None) -> None:
+        self.config = config or CIMConfig()
+
+    @cached_property
+    def ensemble(self) -> CIMEnsemble:
+        """Lazy-load ensemble model."""
+        return CIMEnsemble(self.config)
+
+    def predict(self, features: dict[str, float]) -> dict[str, Any]:
+        """Predict cumulative impact."""
+        return self.ensemble.predict(features)
