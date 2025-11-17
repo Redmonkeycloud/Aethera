@@ -10,9 +10,9 @@ AETHERA is an AI-assisted Environmental Impact Assessment (EIA) copilot. It inge
 ### System Layers
 1. **Data & Ingestion** – manages AOI input, datasets (CORINE, GADM, Natura, hazards, socio-economic), caching, and provenance.
 2. **Geospatial Processing Engine** – validates AOIs, clips base layers, performs overlays, distance/buffer analysis, and zonal statistics.
-3. **AI/ML Engine** – RESM (suitability), AHSM (hazard), CIM (cumulative/biodiversity) pipelines with configuration-driven training/inference.
+3. **AI/ML Engine** – ✅ **FULLY IMPLEMENTED**: RESM (renewable suitability), AHSM (hazard susceptibility), CIM (cumulative impact), and Biodiversity AI (mandatory) with ensemble ML models and configuration-driven training/inference.
 4. **Legal Rules Engine** – applies country-specific YAML/JSON logic for thresholds, buffers, and compliance statements.
-5. **Emissions & Indicators Engine** – computes baseline and project-induced emissions, fragmentation metrics, and environmental KPIs.
+5. **Emissions & Indicators Engine** – ✅ **FULLY IMPLEMENTED**: computes baseline and project-induced emissions, distance-to-receptor calculations, fragmentation metrics, and 20+ scientifically-accurate environmental KPIs.
 6. **Application Backend** – orchestrates project runs, exposes an API (FastAPI) for async jobs, stores outputs, and records logs/manifests.
 7. **Web Frontend** – interactive map/UI (TypeScript + React + MapLibre) for scenario setup, results exploration, and downloads.
 8. **Logging & Monitoring** – structured logs, run manifests, telemetry, and performance metrics for reproducibility.
@@ -149,6 +149,13 @@ chmod +x scripts/setup_dev_env.sh
    - `GET /projects` – list projects.
    - `GET /runs` – list completed runs via `manifest.json` files.
    - `GET /runs/{run_id}/biodiversity/{layer}` – download GeoJSON layers (`sensitivity`, `natura`, `overlap`) for map rendering.
+   - `GET /runs/{run_id}/indicators/receptor-distances` – get distance-to-receptor analysis.
+   - `GET /runs/{run_id}/indicators/kpis` – get comprehensive environmental KPIs.
+   - `GET /runs/{run_id}/indicators/resm` – get RESM (renewable suitability) predictions.
+   - `GET /runs/{run_id}/indicators/ahsm` – get AHSM (hazard susceptibility) predictions.
+   - `GET /runs/{run_id}/indicators/cim` – get CIM (cumulative impact) predictions.
+   - `GET /cache/stats` – get dataset cache statistics.
+   - `POST /cache/clear` – clear the dataset cache.
 
 6. **Frontend (later)**
    ```bash
@@ -172,16 +179,38 @@ make format         # Format code
 
 See `DEVELOPMENT.md` for detailed development guide.
 
+### Current Status
+
+**✅ Completed Phases:**
+- **Phase 0 (Foundation & Infrastructure)**: CI/CD pipeline, development environment standardization
+- **Phase 1 (Core Geospatial Pipeline)**: WKT support, comprehensive dataset caching mechanism
+- **Phase 2 (Emissions & Indicators)**: Distance-to-receptor calculations, advanced environmental KPIs (20+ indicators)
+- **Phase 3 (AI/ML Models)**: RESM, AHSM, CIM, and Biodiversity AI fully implemented with ensemble ML approaches
+
+**🚧 In Progress:**
+- Legal Rules Engine (Phase 4)
+- Async processing with Celery (Phase 5)
+- Report generation integration (Phase 7)
+
 ### Next Steps
-- Flesh out `main_controller` orchestration (dataset download, AOI validation, CORINE clipping).
-- Implement GIS utilities (tiling, buffering, zonal stats).
-- Stand up FastAPI service with project/run endpoints and Celery workers.
-- Build RESM/AHSM/CIM training + inference scripts using the YAML configs.
-- Design the legal rules DSL and prototype a single-country ruleset.
-- Create the frontend map UI and data panels once backend APIs stabilize.
+- Design and implement the legal rules DSL and prototype a single-country ruleset.
+- Stand up Celery workers for async processing.
+- Wire report generation into the main pipeline.
+- Create the modern frontend map UI (React + MapLibre) with AOI upload/drawing.
+
+### AI/ML Models
+
+All models support external training data with synthetic fallback:
+
+- **Biodiversity AI** (mandatory): Ensemble classification (Logistic Regression, Random Forest, Gradient Boosting)
+- **RESM** (Renewable/Resilience Suitability): Ensemble regression (Ridge, Random Forest, Gradient Boosting) - scores 0-100
+- **AHSM** (Asset Hazard Susceptibility): Ensemble classification for multi-hazard risk assessment (flood, wildfire, landslide)
+- **CIM** (Cumulative Impact Model): Integrates all other models and environmental KPIs for comprehensive impact assessment
+
+Place training datasets (CSV/Parquet) under `data2/biodiversity/`, `data2/resm/`, `data2/ahsm/`, or `data2/cim/`. The controller automatically discovers these files, uses them for model ensembles, and logs the dataset source in the `model_runs` table. If no dataset is found, models fall back to synthetic samples so the pipeline can still operate.
 
 ### Biodiversity Training Data
-Place any curated biodiversity training dataset (CSV/Parquet) under `data2/biodiversity/`. `scripts/build_biodiversity_training.py` already generates `training.csv` from Natura 2000 and CORINE overlays (official EU datasets). The controller automatically discovers files such as `training.csv` or `training.parquet`, uses them for model ensembles, and logs the dataset source in the `model_runs` table. If no dataset is found, it falls back to synthetic samples so the pipeline can still operate.
+`scripts/build_biodiversity_training.py` generates `training.csv` from Natura 2000 and CORINE overlays (official EU datasets).
 
 Additional vetted internet sources can be downloaded with `scripts/fetch_external_biodiversity_sources.py`, which currently pulls:
 - Our World in Data – *Biodiversity habitat loss (Williams et al. 2021)* (`data2/biodiversity/external/owid_biodiversity_habitat_loss.csv`).

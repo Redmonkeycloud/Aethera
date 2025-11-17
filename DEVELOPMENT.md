@@ -194,6 +194,12 @@ cd backend
 python -m src.main_controller --aoi path/to/aoi.geojson --project-type solar_farm
 ```
 
+**Run country-wide analysis:**
+```bash
+cd scripts
+python run_country_analysis.py ITA --project-type solar_farm
+```
+
 ## Project Structure
 
 ```
@@ -203,19 +209,44 @@ Aethera/
 ├── backend/
 │   ├── src/                # Main source code
 │   │   ├── api/           # FastAPI routes
+│   │   │   └── routes/    # API route handlers
+│   │   │       ├── biodiversity.py
+│   │   │       ├── countries.py
+│   │   │       ├── projects.py
+│   │   │       ├── runs.py
+│   │   │       ├── indicators.py  # RESM, AHSM, CIM, KPIs
+│   │   │       └── cache.py
+│   │   ├── analysis/      # Analysis modules
+│   │   │   ├── biodiversity.py
+│   │   │   ├── land_cover.py
+│   │   │   ├── receptors.py  # Distance-to-receptor
+│   │   │   ├── kpis.py       # Environmental KPIs
+│   │   │   ├── resm_features.py
+│   │   │   └── ahsm_features.py
 │   │   ├── db/            # Database client and schema
-│   │   ├── datasets/      # Dataset connectors
+│   │   ├── datasets/      # Dataset connectors & caching
 │   │   ├── emissions/      # Emissions calculations
 │   │   ├── reporting/     # Report generation
-│   │   └── utils/         # Utility functions
+│   │   └── utils/         # Utility functions (geometry, WKT)
 │   ├── tests/             # Test suite
 │   └── pyproject.toml     # Python project config
 ├── ai/
-│   ├── models/            # ML models (RESM, AHSM, CIM, Biodiversity)
+│   ├── models/            # ML models
+│   │   ├── biodiversity.py  # ✅ Fully implemented
+│   │   ├── resm.py          # ✅ Fully implemented
+│   │   ├── ahsm.py          # ✅ Fully implemented
+│   │   └── cim.py           # ✅ Fully implemented
 │   ├── config/            # Model configurations
 │   └── training/          # Training scripts
 ├── scripts/               # Utility scripts
+│   ├── run_country_analysis.py
+│   ├── build_biodiversity_training.py
+│   └── setup_dev_env.*
 ├── docs/                  # Documentation
+│   ├── WKT_SUPPORT.md
+│   ├── DATASET_CACHING.md
+│   ├── ENVIRONMENTAL_KPIS_BIBLIOGRAPHY.md
+│   └── GADM_LEVELS_EXPLAINED.md
 ├── docker/                # Docker configurations
 ├── .pre-commit-config.yaml # Pre-commit hooks
 ├── Makefile               # Convenience commands

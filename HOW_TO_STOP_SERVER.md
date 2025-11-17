@@ -41,11 +41,27 @@ cd D:\Aethera_original\backend
 python -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
+**Or using Make (if available):**
+```bash
+make run-api
+```
+
 ## Check if Server is Running
 
 ```powershell
 curl http://localhost:8000/docs
+# Or visit in browser: http://localhost:8000/docs
 ```
 
 If you get a response, the server is running!
+
+## Available Endpoints
+
+Once the server is running, you can access:
+
+- **API Documentation**: http://localhost:8000/docs (Swagger UI)
+- **Health Check**: http://localhost:8000/health
+- **Root**: http://localhost:8000/ (redirects to /docs)
+
+See `SETUP_COMPLETE.md` for a full list of available endpoints.
 
