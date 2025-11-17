@@ -8,6 +8,14 @@ data2/
 *.cpg
 *.osm.pbf
 
+# Generated analysis results (too large for git)
+data/
+tmp/
+
+# Test files
+test_aoi*.geojson
+temp_*.geojson
+
 # Python
 __pycache__/
 *.py[cod]
