@@ -1,0 +1,18 @@
+baseline:
+  corine_ha_tco2e:
+    "111": 5.0   # Continuous urban fabric
+    "112": 4.5
+    "121": 3.0
+    "211": -4.0  # Arable land (sequestration)
+    "311": -6.0  # Broad-leaved forest
+    "312": -5.5  # Coniferous forest
+    "313": -5.0  # Mixed forest
+    "411": -3.0  # Inland marshes
+    "511": -2.0  # Water courses
+project:
+  land_clearing_tco2e_per_ha: 30.0
+  construction_tco2e_per_mw: 500.0
+  operation_tco2e_per_mw_year: 20.0
+defaults:
+  project_capacity_mw: 50
+

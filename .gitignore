@@ -1,59 +1,43 @@
-# === Python ===
-__pycache__/
-*.py[cod]
-*.egg
-*.egg-info/
-*.pyo
-*.pyd
-.Python
-
-# === Virtual Environment ===
-venv/
-env/
-ENV/
-.venv/
-
-# === Jupyter Notebooks (if used in the future) ===
-.ipynb_checkpoints/
-
-# === Data and Outputs ===
-data/
-outputs/
-*.csv
-*.xlsx
-*.pdf
-*.geojson
+# Large geospatial datasets (too large for git)
+data2/
+*.gpkg
 *.shp
 *.shx
 *.dbf
 *.prj
-*.gpkg
-*.zip
-*.tif
-*.gdb
+*.cpg
+*.osm.pbf
 
-# === Logs ===
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
 logs/
 
-# === VSCode and other IDEs ===
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
+# Database
+*.db
+*.sqlite
 
-# === OS/System Files ===
-.DS_Store
-Thumbs.db
-desktop.ini
+# Temporary files
+*.tmp
+*.temp
 
-# === Reports ===
-*.pdf
-*.docx
-
-# === Test Results ===
-htmlcov/
-.coverage
-.tox/
-.nox/
-pytest_cache/

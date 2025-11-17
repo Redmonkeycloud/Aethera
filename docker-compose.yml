@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  db:
+    build:
+      context: ./docker/postgres
+    container_name: aethera-postgres
+    environment:
+      POSTGRES_DB: aethera
+      POSTGRES_USER: aethera
+      POSTGRES_PASSWORD: aethera
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./tmp/db-data:/var/lib/postgresql/data
+
