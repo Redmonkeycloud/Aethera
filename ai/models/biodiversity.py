@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-import logging
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
@@ -29,7 +29,7 @@ class BiodiversityConfig:
     candidate_models: list[str] | None = None
     thresholds: dict | None = None
     vector_fields: list[str] | None = None
-    training_data_path: Optional[str] = None
+    training_data_path: str | None = None
 
 
 class BiodiversityEnsemble:
@@ -47,7 +47,7 @@ class BiodiversityEnsemble:
         self._models = self._train_models()
 
     @staticmethod
-    def _generate_training_data(n: int = 1500) -> Tuple[np.ndarray, np.ndarray]:
+    def _generate_training_data(n: int = 1500) -> tuple[np.ndarray, np.ndarray]:
         rng = np.random.default_rng(42)
         protected_overlap_pct = rng.uniform(0, 60, size=n)
         fragmentation_index = rng.uniform(0, 1, size=n)
@@ -78,7 +78,7 @@ class BiodiversityEnsemble:
         y = np.digitize(severity, bins) - 1
         return X, y
 
-    def _load_external_training_data(self) -> Tuple[np.ndarray, np.ndarray] | None:
+    def _load_external_training_data(self) -> tuple[np.ndarray, np.ndarray] | None:
         if not self.training_data_path:
             return None
         path = self.training_data_path
@@ -121,7 +121,7 @@ class BiodiversityEnsemble:
         X = df[self.vector_fields].to_numpy()
         return X, y.astype(int)
 
-    def _train_models(self) -> List[Tuple[str, Any]]:
+    def _train_models(self) -> list[tuple[str, Any]]:
         external = self._load_external_training_data()
         if external:
             X, y = external
@@ -132,7 +132,7 @@ class BiodiversityEnsemble:
             dataset_source = "synthetic"
         self.dataset_source = dataset_source
 
-        models: List[Tuple[str, Any]] = []
+        models: list[tuple[str, Any]] = []
 
         lr_pipeline = Pipeline(
             [
@@ -153,13 +153,13 @@ class BiodiversityEnsemble:
 
         return models
 
-    def _vectorize(self, features: Dict[str, float]) -> np.ndarray:
+    def _vectorize(self, features: dict[str, float]) -> np.ndarray:
         return np.array([float(features.get(field, 0.0)) for field in self.vector_fields])
 
-    def predict(self, features: Dict[str, float]) -> Dict[str, Any]:
+    def predict(self, features: dict[str, float]) -> dict[str, Any]:
         x = self._vectorize(features)
-        probabilities: List[np.ndarray] = []
-        details: List[Dict[str, Any]] = []
+        probabilities: list[np.ndarray] = []
+        details: list[dict[str, Any]] = []
 
         for name, model in self._models:
             proba = model.predict_proba([x])[0]

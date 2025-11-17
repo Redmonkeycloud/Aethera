@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import random
 from pathlib import Path
-from typing import List
 
 import geopandas as gpd
 import pandas as pd
@@ -63,7 +62,7 @@ def build_training_dataframe(sample_count: int, seed: int) -> pd.DataFrame:
     random.seed(seed)
     natura = load_datasets()
     sindex = natura.sindex
-    collected: List[dict] = []
+    collected: list[dict] = []
     
     # Get bounding box of natura data for sampling
     natura_bounds = natura.total_bounds

@@ -10,37 +10,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 
 @dataclass
 class ReportEntry:
     report_id: str
-    project_id: Optional[str]
-    run_id: Optional[str]
+    project_id: str | None
+    run_id: str | None
     version: int
     status: str
     created_at: datetime
     updated_at: datetime
-    summary: Optional[str] = None
-    file_path: Optional[Path] = None
+    summary: str | None = None
+    file_path: Path | None = None
 
 
 class ReportMemoryStore:
     """In-memory placeholder that mirrors the future database-backed store."""
 
     def __init__(self) -> None:
-        self._entries: List[ReportEntry] = []
+        self._entries: list[ReportEntry] = []
 
     def add_entry(self, entry: ReportEntry) -> None:
         """Register a new report version (placeholder until DB is ready)."""
         self._entries.append(entry)
 
-    def list_entries(self) -> List[ReportEntry]:
+    def list_entries(self) -> list[ReportEntry]:
         """Return known reports (currently in-memory)."""
         return list(self._entries)
 
-    def find_similar(self, summary: str) -> List[ReportEntry]:
+    def find_similar(self, summary: str) -> list[ReportEntry]:
         """Stub for future embedding/vector search."""
         # TODO: integrate pgvector/FAISS to search by semantic similarity.
         return []

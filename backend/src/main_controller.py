@@ -4,31 +4,31 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
-import sys
 
 import geopandas as gpd
 
+from .analysis.biodiversity import build_biodiversity_features, compute_overlap_metrics
+from .analysis.land_cover import summarize_land_cover
 from .config.base_settings import settings
 from .datasets.catalog import DatasetCatalog
+from .db import DatabaseClient, ModelRunLogger, ModelRunRecord
+from .emissions.calculator import EmissionCalculator
+from .emissions.factors import EmissionFactorStore
 from .gis_handler import GISHandler
 from .logging_utils import configure_logging, get_logger
 from .utils.geometry import buffer_aoi, load_aoi
-from .analysis.land_cover import summarize_land_cover
-from .analysis.biodiversity import (
-    compute_overlap_metrics,
-    build_biodiversity_features,
-)
-from .emissions.factors import EmissionFactorStore
-from .emissions.calculator import EmissionCalculator
-from .db import DatabaseClient, ModelRunLogger, ModelRunRecord
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ai.models.biodiversity import BiodiversityModel, BiodiversityConfig  # type: ignore  # noqa: E402
+from ai.models.biodiversity import (  # type: ignore  # noqa: E402
+    BiodiversityConfig,
+    BiodiversityModel,
+)
 
 
 logger = get_logger(__name__)
@@ -55,7 +55,7 @@ def ensure_run_dirs(base_dir: Path) -> Path:
 def load_run_config(config_path: str | None) -> dict:
     if not config_path:
         return {}
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -85,7 +85,6 @@ def main() -> None:
     land_cover_summary = summarize_land_cover(corine_clip)
     gis.save_summary(land_cover_summary, "land_cover_summary.json")
 
-    biodiversity_metrics = {}
     biodiversity_prediction = {}
     training_data_path = catalog.biodiversity_training()
 
@@ -100,7 +99,9 @@ def main() -> None:
         natura_clip = gis.clip_vector(natura_path, aoi, "biodiversity/natura_clipped.gpkg")
         if not natura_clip.empty:
             natura_geojson = natura_clip.to_crs("EPSG:4326")
-            path = gis.save_vector(natura_geojson, "biodiversity/natura_clipped.geojson", driver="GeoJSON")
+            path = gis.save_vector(
+                natura_geojson, "biodiversity/natura_clipped.geojson", driver="GeoJSON"
+            )
             if path:
                 biodiversity_layers["natura"] = f"/runs/{run_id}/biodiversity/natura"
     else:
@@ -125,18 +126,24 @@ def main() -> None:
 
     sensitivity_layer = aoi.copy()
     sensitivity_layer["biodiversity_score"] = biodiversity_prediction["score"]
-    sensitivity_layer["biodiversity_sensitivity"] = biodiversity_prediction["sensitivity"]
+    sensitivity_layer["biodiversity_sensitivity"] = biodiversity_prediction[
+        "sensitivity"
+    ]
     sensitivity_layer = sensitivity_layer.to_crs("EPSG:4326")
-    sensitivity_path = gis.save_vector(sensitivity_layer, "biodiversity/sensitivity.geojson", driver="GeoJSON")
+    sensitivity_path = gis.save_vector(
+        sensitivity_layer, "biodiversity/sensitivity.geojson", driver="GeoJSON"
+    )
     if sensitivity_path:
         biodiversity_layers["sensitivity"] = f"/runs/{run_id}/biodiversity/sensitivity"
 
     try:
-        candidate_models = [detail["model"] for detail in biodiversity_prediction.get("model_details", [])]
-        selected_model = max(
-            biodiversity_prediction.get("model_details", []),
-            key=lambda d: d.get("confidence", 0),
-        )["model"] if biodiversity_prediction.get("model_details") else None
+        model_details = biodiversity_prediction.get("model_details", [])
+        candidate_models = [detail["model"] for detail in model_details]
+        selected_model = (
+            max(model_details, key=lambda d: d.get("confidence", 0))["model"]
+            if model_details
+            else None
+        )
 
         db_client = DatabaseClient(settings.postgres_dsn)
         model_logger = ModelRunLogger(db_client)
@@ -166,7 +173,10 @@ def main() -> None:
 
     project_params = {
         "type": args.project_type,
-        "capacity_mw": run_config.get("capacity_mw") or run_config.get("project", {}).get("capacity_mw"),
+        "capacity_mw": (
+            run_config.get("capacity_mw")
+            or run_config.get("project", {}).get("capacity_mw")
+        ),
     }
     emission_result = emission_calculator.compute(land_cover_summary, project_params)
     gis.save_summary([emission_result.as_dict()], "emissions_summary.json")
@@ -180,8 +190,14 @@ def main() -> None:
         "outputs": {
             "biodiversity_layers": biodiversity_layers,
             "summaries": {
-                "land_cover": str((run_dir / settings.processed_dir_name / "land_cover_summary.json").relative_to(run_dir)),
-                "emissions": str((run_dir / settings.processed_dir_name / "emissions_summary.json").relative_to(run_dir)),
+                "land_cover": str(
+                    (run_dir / settings.processed_dir_name / "land_cover_summary.json")
+                    .relative_to(run_dir)
+                ),
+                "emissions": str(
+                    (run_dir / settings.processed_dir_name / "emissions_summary.json")
+                    .relative_to(run_dir)
+                ),
             },
         },
     }

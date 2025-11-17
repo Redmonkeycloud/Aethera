@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .report_memory import ReportMemoryStore
 from ..logging_utils import get_logger
+from .report_memory import ReportMemoryStore
 
 
 logger = get_logger(__name__)
@@ -25,10 +25,11 @@ class ReportEngine:
             lstrip_blocks=True,
         )
 
-    def render(self, template_name: str, context: Dict[str, Any]) -> str:
+    def render(self, template_name: str, context: dict[str, Any]) -> str:
         template = self.env.get_template(template_name)
 
-        # Placeholder hook: future versions will retrieve similar report sections and augment context.
+        # Placeholder hook: future versions will retrieve similar report sections
+        # and augment context.
         logger.debug("Rendering report using template %s", template_name)
         return template.render(**context)
 

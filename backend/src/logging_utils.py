@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from rich.logging import RichHandler
 
@@ -12,7 +11,7 @@ from rich.logging import RichHandler
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 
-def configure_logging(log_dir: Optional[Path] = None, log_level: int = logging.INFO) -> None:
+def configure_logging(log_dir: Path | None = None, log_level: int = logging.INFO) -> None:
     handlers: list[logging.Handler] = [RichHandler(markup=False, show_time=False)]
 
     if log_dir:

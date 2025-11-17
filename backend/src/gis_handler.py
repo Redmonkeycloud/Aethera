@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 from geopandas import GeoDataFrame
@@ -36,7 +36,9 @@ class GISHandler:
         logger.info("Saved clipped dataset to %s", output_path)
         return clipped
 
-    def save_vector(self, gdf: GeoDataFrame, output_name: str, driver: Optional[str] = None) -> Optional[Path]:
+    def save_vector(
+        self, gdf: GeoDataFrame, output_name: str, driver: str | None = None
+    ) -> Path | None:
         if gdf.empty:
             logger.warning("Requested to save %s but GeoDataFrame is empty.", output_name)
             return None
@@ -50,8 +52,6 @@ class GISHandler:
         return output_path
 
     def save_summary(self, data: list[dict], file_name: str) -> Path:
-        import json
-
         output_path = self.output_dir / file_name
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from ..models import RunSummary, RunDetail
-from ..storage import RunManifestStore
 from ...config.base_settings import settings
+from ..models import RunDetail, RunSummary
+from ..storage import RunManifestStore
 
 
 router = APIRouter()
