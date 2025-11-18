@@ -6,7 +6,10 @@ datasets
 db
 emissions
 gis_handler
+legal
 logging_utils
 main_controller
 reporting
+storage
 utils
+workers

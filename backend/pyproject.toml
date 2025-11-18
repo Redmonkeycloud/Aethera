@@ -3,9 +3,9 @@ name = "aethera-backend"
 version = "0.1.0"
 description = "Core backend, geospatial engine, emissions, and orchestration for AETHERA."
 authors = [{name = "AETHERA Team"}]
-readme = "../README.md"
+# readme = "../README.md"  # Commented out - causes path issues during install
 license = {text = "Proprietary"}
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
@@ -37,7 +37,6 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "jinja2>=3.1",
-    "jsonlogic-python>=1.0.0",
     "boto3>=1.34.0"
 ]
 
@@ -51,6 +50,9 @@ dev = [
     "types-requests",
     "types-python-dateutil"
 ]
+legal = [
+    "jsonlogic>=1.0.0"  # Optional: for advanced JSONLogic rule evaluation (fallback available)
+]
 
 [build-system]
 requires = ["setuptools>=75"]
@@ -59,10 +61,10 @@ build-backend = "setuptools.build_meta"
 [tool.ruff]
 select = ["E", "F", "I", "UP", "B", "PL", "RUF"]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 strict = false
 warn_unused_ignores = true
 warn_redundant_casts = true
