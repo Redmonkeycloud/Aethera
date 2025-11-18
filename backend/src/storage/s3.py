@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import BinaryIO
 
 try:
-    import boto3
-    from botocore.exceptions import ClientError
+    import boto3  # type: ignore[import-untyped]
+    from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 except ImportError:
-    boto3 = None  # type: ignore
-    ClientError = Exception  # type: ignore
+    boto3 = None  # type: ignore[assignment]
+    ClientError = Exception  # type: ignore[assignment]
 
 from ..logging_utils import get_logger
 from .base import StorageBackend, StorageConfig
