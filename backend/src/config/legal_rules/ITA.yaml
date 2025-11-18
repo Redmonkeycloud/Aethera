@@ -1,0 +1,176 @@
+# Legal Rules for Italy (ITA)
+# EIA-specific regulations and compliance requirements
+
+country_code: ITA
+country_name: Italy
+version: "1.0.0"
+metadata:
+  jurisdiction: "Italian Republic"
+  applicable_laws:
+    - "D.Lgs 152/2006 (Environmental Code)"
+    - "Directive 2014/52/EU (EU EIA Directive)"
+    - "Direttiva 92/43/CEE (Habitats Directive)"
+    - "D.Lgs 42/2004 (Cultural Heritage Code)"
+  last_updated: "2025-01-01"
+  sources:
+    - "D.Lgs 152/2006 (Codice dell'Ambiente)"
+    - "D.Lgs 227/2001 (Forest Law)"
+    - "D.Lgs 42/2004 (Codice dei beni culturali)"
+    - "Directive 2014/52/EU"
+    - "Direttiva 92/43/CEE (Habitats Directive)"
+    - "Direttiva 2000/60/CE (Water Framework Directive)"
+
+rules:
+  # EIA Thresholds (D.Lgs 152/2006, Allegato IV)
+  - id: "ita_eia_solar_threshold"
+    name: "Solar Power Plant EIA Threshold"
+    description: "Solar power plants exceeding 300 MW require mandatory EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "solar"
+        - capacity_mw:
+            ">": 300
+    message_template: "Solar power plant capacity ({capacity_mw} MW) exceeds 300 MW threshold. Mandatory EIA required under D.Lgs 152/2006, Allegato IV."
+    references:
+      - "D.Lgs 152/2006, Allegato IV, Parte II"
+      - "Directive 2014/52/EU, Annex I"
+
+  - id: "ita_eia_wind_threshold"
+    name: "Wind Power Plant EIA Threshold"
+    description: "Wind power plants exceeding 150 MW require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "wind"
+        - capacity_mw:
+            ">": 150
+    message_template: "Wind power plant capacity ({capacity_mw} MW) exceeds 150 MW threshold. Mandatory EIA required."
+    references:
+      - "D.Lgs 152/2006, Allegato IV"
+
+  - id: "ita_eia_area_threshold"
+    name: "Project Area EIA Threshold"
+    description: "Projects affecting more than 150 hectares require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      aoi_area_ha:
+        ">": 150
+    message_template: "Project area ({aoi_area_ha:.1f} ha) exceeds 150 ha threshold. Mandatory EIA required."
+    references:
+      - "D.Lgs 152/2006, Allegato IV"
+
+  # Biodiversity & Protected Areas
+  - id: "ita_bio_natura_assessment"
+    name: "Natura 2000 Appropriate Assessment"
+    description: "Projects affecting Natura 2000 sites require appropriate assessment"
+    category: "biodiversity"
+    severity: "critical"
+    condition:
+      protected_overlap_pct:
+        ">": 0
+    message_template: "Project overlaps {protected_overlap_pct:.2f}% of Natura 2000 site. Appropriate assessment (Valutazione di Incidenza) required under D.Lgs 152/2006."
+    references:
+      - "Direttiva 92/43/CEE, Articolo 6(3)"
+      - "D.Lgs 152/2006, Parte III"
+
+  - id: "ita_bio_protected_buffer"
+    name: "Protected Area Buffer Zone"
+    description: "Projects within 1km of protected areas require enhanced assessment"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      distance_to_protected_km:
+        "<": 1.0
+    message_template: "Project is {distance_to_protected_km:.2f} km from protected area. Enhanced biodiversity assessment required."
+    references:
+      - "D.Lgs 152/2006, Parte III"
+
+  - id: "ita_bio_forest_protection"
+    name: "Forest Area Protection"
+    description: "Forest conversion exceeding 5 ha requires authorization"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      and:
+        - forest_ratio:
+            ">": 0.3
+        - aoi_area_ha:
+            ">": 5
+    message_template: "Project affects {forest_ratio:.1%} forest cover ({aoi_area_ha:.1f} ha). Forest conversion authorization required."
+    references:
+      - "D.Lgs 227/2001 (Forest Law)"
+
+  # Water Protection
+  - id: "ita_water_proximity"
+    name: "Water Body Proximity"
+    description: "Projects within 300m of water bodies require water impact assessment"
+    category: "water"
+    severity: "high"
+    condition:
+      distance_to_water_km:
+        "<": 0.3
+    message_template: "Project is {distance_to_water_km:.2f} km from water body. Water impact assessment required under D.Lgs 152/2006, Parte III."
+    references:
+      - "D.Lgs 152/2006, Parte III"
+      - "Direttiva 2000/60/CE (Water Framework Directive)"
+
+  # Emissions
+  - id: "ita_emissions_climate"
+    name: "Climate Impact Assessment"
+    description: "Projects exceeding 150,000 tCO2e/year require climate impact assessment"
+    category: "emissions"
+    severity: "high"
+    condition:
+      project_operation_tco2e_per_year:
+        ">": 150000
+    message_template: "Project emissions ({project_operation_tco2e_per_year:.0f} tCO2e/year) exceed threshold. Climate impact assessment required."
+    references:
+      - "D.Lgs 152/2006, Parte V"
+
+  # Land Use & Cultural Heritage
+  - id: "ita_land_use_agricultural"
+    name: "Agricultural Land Protection"
+    description: "Conversion of agricultural land exceeding 20 ha requires assessment"
+    category: "land_use"
+    severity: "medium"
+    condition:
+      and:
+        - agricultural_ratio:
+            ">": 0.5
+        - aoi_area_ha:
+            ">": 20
+    message_template: "Project converts {agricultural_ratio:.1%} agricultural land ({aoi_area_ha:.1f} ha). Agricultural impact assessment required."
+    references:
+      - "D.Lgs 152/2006"
+
+  - id: "ita_cultural_heritage"
+    name: "Cultural Heritage Protection"
+    description: "Projects near cultural heritage sites require assessment"
+    category: "cultural_heritage"
+    severity: "high"
+    condition:
+      distance_to_settlement_km:
+        "<": 0.5
+    message_template: "Project is {distance_to_settlement_km:.2f} km from settlement. Cultural heritage impact assessment may be required."
+    references:
+      - "D.Lgs 42/2004 (Codice dei beni culturali)"
+
+  # Cumulative Impact
+  - id: "ita_cumulative_impact"
+    name: "Cumulative Impact Assessment"
+    description: "High cumulative impact requires comprehensive assessment"
+    category: "cumulative_impact"
+    severity: "critical"
+    condition:
+      cim_score:
+        ">": 75
+    message_template: "Cumulative impact score is {cim_score:.1f} (high). Comprehensive EIA required."
+    references:
+      - "D.Lgs 152/2006, Articolo 4"
+

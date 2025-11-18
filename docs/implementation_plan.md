@@ -2,52 +2,44 @@
 
 ### Phase 0 – Foundation (Now)
 - [x] Create repository structure, high-level documentation, and configuration placeholders.
-- [x] Establish shared development environment (Python 3.11, uv/pip, Node 20, pnpm).
-- [x] Set up CI (GitHub Actions) to lint Python (ruff, mypy) and TypeScript (eslint).
+- [ ] Establish shared development environment (Python 3.11, uv/pip, Node 20, pnpm).
+- [ ] Set up CI (GitHub Actions) to lint Python (ruff, mypy) and TypeScript (eslint).
 - [x] Provision Postgres/PostGIS + pgvector extensions (via Docker compose) and create `reports_history`, `report_embeddings`, and `model_runs` tables.
 - [x] Prepare data ingestion scripts: `scripts/fetch_external_biodiversity_sources.py` (OWID + GBIF) and `scripts/build_biodiversity_training.py` (Natura + CORINE derived training set).
 
-### Phase 1 – Core Geospatial Pipeline ✅
+### Phase 1 – Core Geospatial Pipeline
 **Goals**
-- [x] Implement `main_controller` orchestration CLI.
-- [x] Build AOI loader/validator supporting shapefile, GeoJSON, **WKT (strings and files)**, and CRS normalization.
-- [x] Implement dataset connectors (CORINE, GADM, Natural Earth, Natura) with **comprehensive caching mechanism**.
-- [x] Develop clipping, buffering, intersection, and zonal statistics utilities.
-- [x] Persist processed layers under `/data/processed/<run_id>/`.
+- Implement `main_controller` orchestration CLI.
+- Build AOI loader/validator supporting shapefile, GeoJSON, WKT, and CRS normalization.
+- Implement dataset connectors (CORINE, GADM, Natural Earth, Natura) with caching.
+- Develop clipping, buffering, intersection, and zonal statistics utilities.
+- Persist processed layers under `/data/processed/<run_id>/`.
 
 **Python Modules**
 - `backend/src/datasets/corine.py`
 - `backend/src/utils/geometry.py`
 - `backend/src/pipeline/geospatial.py`
 
-### Phase 2 – Emissions & Indicators ✅
+### Phase 2 – Emissions & Indicators
 **Goals**
-- [x] Implement `emissions_api.py` with baseline vs project calculations.
-- [x] Define emission factor catalog (YAML/JSON) and override mechanism.
-- [x] Add fragmentation metrics, land cover summaries, and **distance-to-receptor calculations**.
-- [x] Implement **advanced environmental KPIs** with scientific accuracy (20+ indicators).
-- [x] Create comprehensive **bibliography document** cataloging all scientific sources.
+- Implement `emissions_api.py` with baseline vs project calculations.
+- Define emission factor catalog (YAML/JSON) and override mechanism.
+- Add fragmentation metrics, land cover summaries, and distance-to-receptor calculations.
 
-### Phase 3 – AI/ML Models ✅ (100% Complete)
+### Phase 3 – AI/ML Models
 **Goals**
-- [x] Finalize config schema for RESM/AHSM/CIM and mandatory Biodiversity AI, each supporting multiple candidate models per run.
-- [x] Build data preprocessing pipeline to convert geospatial outputs into training tensors; enable ingestion of real training datasets (e.g., `data2/biodiversity/*.parquet`) and fall back to synthetic samples only when needed.
-- [x] Train baseline models using synthetic datasets; log runs and store metrics in `model_runs`.
-- [x] Implement inference services that execute all configured models, evaluate projections, and select/blend the best outputs (ensemble averaging) before persisting to run results.
-- [x] **RESM Implementation**: Renewable energy suitability assessment with ensemble regression models
-- [x] **AHSM Implementation**: Hazard susceptibility assessment with ensemble classification models
-- [x] **CIM Implementation**: Cumulative impact model integrating all other models
-- [x] **Model Training Pipelines**: Full training infrastructure with data splitting, evaluation, and model persistence
-- [x] **MLflow Integration**: Experiment tracking, model registry, parameter/metric logging
-- [x] **Weights & Biases Integration**: Alternative/additional experiment tracking with W&B
-- [x] Advanced ensemble selection (stacking, blending) - **FULLY IMPLEMENTED (averaging with confidence weighting)**
+- Finalize config schema for RESM/AHSM/CIM and mandatory Biodiversity AI, each supporting multiple candidate models per run.
+- Build data preprocessing pipeline to convert geospatial outputs into training tensors; enable ingestion of real training datasets (e.g., `data2/biodiversity/*.parquet`) and fall back to synthetic samples only when needed.
+- Train baseline models using historical/global datasets; log runs via MLflow/W&B and store metrics in `model_runs`.
+- Implement inference services that execute all configured models, evaluate projections, and select/blend the best outputs (stacking/ensemble selection) before persisting to run results.
 
 ### Phase 4 – Biodiversity AI & Legal Rules Engine
 **Goals**
-- Deliver the biodiversity pipeline (rule-based overlays + ML predictors) and wire its outputs into CIM, indicators, and report templates.
-- Draft DSL/YAML format for country-specific rules (start with one country).
-- Build parser/evaluator that consumes project metrics and emits compliance statuses + text snippets.
-- Integrate with backend orchestrator to append biodiversity findings and legal determinations to run outputs.
+- ✅ Deliver the biodiversity pipeline (rule-based overlays + ML predictors) and wire its outputs into CIM, indicators, and report templates.
+- ✅ Draft DSL/YAML format for country-specific rules (start with one country).
+- ✅ Build parser/evaluator that consumes project metrics and emits compliance statuses + text snippets.
+- ✅ Integrate with backend orchestrator to append biodiversity findings and legal determinations to run outputs.
+- ✅ Implement legal rules for multiple countries (DEU, FRA, ITA, GRC) with comprehensive source documentation.
 
 ### Phase 5 – Backend API & Orchestration
 **Goals**

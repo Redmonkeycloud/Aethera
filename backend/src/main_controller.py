@@ -17,6 +17,8 @@ from .analysis.kpis import calculate_comprehensive_kpis
 from .analysis.resm_features import build_resm_features
 from .analysis.ahsm_features import build_ahsm_features
 from .config.base_settings import settings
+from .legal import LegalEvaluator, LegalEvaluationResult
+from .legal.loader import LegalRulesLoader
 from .datasets.catalog import DatasetCatalog
 from .db import DatabaseClient, ModelRunLogger, ModelRunRecord
 from .emissions.calculator import EmissionCalculator
@@ -47,6 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--project-type", required=True, help="Project type identifier.")
     parser.add_argument("--output-dir", help="Override default output directory.")
     parser.add_argument("--config", help="Optional JSON/YAML config for this run.")
+    parser.add_argument("--country", help="ISO 3166-1 alpha-3 country code (e.g., DEU, FRA) for legal rules evaluation.")
     return parser.parse_args()
 
 
@@ -386,6 +389,103 @@ def main() -> None:
     except Exception as exc:
         logger.warning("Unable to log model metadata: %s", exc)
 
+    # Legal Rules Engine Evaluation
+    legal_evaluation: LegalEvaluationResult | None = None
+    country_code = args.country or run_config.get("country") or run_config.get("country_code")
+    if country_code:
+        try:
+            logger.info("Evaluating legal rules for country %s", country_code)
+            loader = LegalRulesLoader()
+            rule_set = loader.load_country_rules(country_code.upper())
+            if rule_set:
+                # Prepare project metrics for legal evaluation
+                project_metrics = {
+                    "protected_overlap_pct": overlap_metrics.get("protected_overlap_pct", 0.0),
+                    "distance_to_protected_km": (
+                        receptor_summary.get("nearest_protected_area", {}).get("distance_km", 999.0)
+                        if receptor_summary.get("nearest_protected_area")
+                        else 999.0
+                    ),
+                    "biodiversity_score": biodiversity_prediction.get("score", 0.0),
+                    "project_operation_tco2e_per_year": emission_result.as_dict().get("project_operation_tco2e_per_year", 0.0),
+                    "ghg_emissions_intensity": environmental_kpis.ghg_emissions_intensity,
+                    "forest_ratio": environmental_kpis.natural_habitat_ratio,  # Approximate
+                    "aoi_area_ha": aoi.geometry.area.sum() / 10_000,
+                    "natural_habitat_ratio": environmental_kpis.natural_habitat_ratio,
+                    "distance_to_water_km": (
+                        receptor_summary.get("nearest_water_body", {}).get("distance_km", 999.0)
+                        if receptor_summary.get("nearest_water_body")
+                        else 999.0
+                    ),
+                    "distance_to_settlement_km": (
+                        receptor_summary.get("nearest_settlement", {}).get("distance_km", 999.0)
+                        if receptor_summary.get("nearest_settlement")
+                        else 999.0
+                    ),
+                    "cim_score": cim_prediction.get("score", 0.0),
+                    "ahsm_score": ahsm_prediction.get("score", 0.0),
+                }
+                evaluator = LegalEvaluator(rule_set)
+                legal_evaluation = evaluator.evaluate(project_metrics)
+                # Convert to serializable dict
+                legal_dict = {
+                    "country_code": legal_evaluation.country_code,
+                    "overall_compliant": legal_evaluation.overall_compliant,
+                    "summary": legal_evaluation.summary,
+                    "statuses": [
+                        {
+                            "rule_id": s.rule_id,
+                            "rule_name": s.rule_name,
+                            "passed": s.passed,
+                            "message": s.message,
+                            "severity": s.severity,
+                            "category": s.category,
+                            "details": s.details,
+                        }
+                        for s in legal_evaluation.statuses
+                    ],
+                    "critical_violations": [
+                        {
+                            "rule_id": v.rule_id,
+                            "rule_name": v.rule_name,
+                            "message": v.message,
+                            "severity": v.severity,
+                            "category": v.category,
+                        }
+                        for v in legal_evaluation.critical_violations
+                    ],
+                    "warnings": [
+                        {
+                            "rule_id": w.rule_id,
+                            "rule_name": w.rule_name,
+                            "message": w.message,
+                            "severity": w.severity,
+                            "category": w.category,
+                        }
+                        for w in legal_evaluation.warnings
+                    ],
+                    "informational": [
+                        {
+                            "rule_id": i.rule_id,
+                            "rule_name": i.rule_name,
+                            "message": i.message,
+                            "severity": i.severity,
+                            "category": i.category,
+                        }
+                        for i in legal_evaluation.informational
+                    ],
+                }
+                gis.save_summary([legal_dict], "legal_evaluation.json")
+                logger.info(
+                    "Legal evaluation complete: %s compliant, %d violations",
+                    "Overall" if legal_evaluation.overall_compliant else "Not overall",
+                    len(legal_evaluation.critical_violations),
+                )
+            else:
+                logger.warning("No legal rules found for country %s", country_code)
+        except Exception as exc:
+            logger.warning("Unable to evaluate legal rules: %s", exc)
+
     manifest = {
         "run_id": run_id,
         "project_id": run_config.get("project_id"),
@@ -423,9 +523,23 @@ def main() -> None:
                     (run_dir / settings.processed_dir_name / "cim_prediction.json")
                     .relative_to(run_dir)
                 ),
+                "legal_evaluation": (
+                    str(
+                        (run_dir / settings.processed_dir_name / "legal_evaluation.json")
+                        .relative_to(run_dir)
+                    )
+                    if legal_evaluation
+                    else None
+                ),
             },
         },
     }
+    if legal_evaluation:
+        manifest["legal_compliance"] = {
+            "overall_compliant": legal_evaluation.overall_compliant,
+            "country_code": legal_evaluation.country_code,
+            "summary": legal_evaluation.summary,
+        }
     with open(run_dir / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
@@ -434,4 +548,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
