@@ -1,10 +1,20 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly VITE_API_URL: string
-}
+// GeoJSON types
+declare namespace GeoJSON {
+  interface Geometry {
+    type: string
+    coordinates: unknown
+  }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}
+  interface Feature {
+    type: 'Feature'
+    geometry: Geometry
+    properties?: Record<string, unknown>
+  }
 
+  interface FeatureCollection {
+    type: 'FeatureCollection'
+    features: Feature[]
+  }
+}

@@ -12,8 +12,13 @@ export const apiClient = axios.create({
 
 // Add response interceptor for better error handling
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: unknown) => response,
+  (error: {
+    code?: string
+    message?: string
+    response?: { data?: { detail?: string; message?: string } }
+    request?: unknown
+  }) => {
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timeout - the server took too long to respond'
     } else if (error.response) {
@@ -80,31 +85,31 @@ export interface TaskStatus {
 
 // API functions
 export const projectsApi = {
-  list: () => apiClient.get<Project[]>('/projects').then((res) => res.data),
-  get: (id: string) => apiClient.get<Project>(`/projects/${id}`).then((res) => res.data),
+  list: () => apiClient.get<Project[]>('/projects').then((res: { data: Project[] }) => res.data),
+  get: (id: string) => apiClient.get<Project>(`/projects/${id}`).then((res: { data: Project }) => res.data),
   create: (data: ProjectCreate) =>
-    apiClient.post<Project>('/projects', data).then((res) => res.data),
+    apiClient.post<Project>('/projects', data).then((res: { data: Project }) => res.data),
 }
 
 export const runsApi = {
-  list: () => apiClient.get<RunSummary[]>('/runs').then((res) => res.data),
-  get: (id: string) => apiClient.get<RunDetail>(`/runs/${id}`).then((res) => res.data),
+  list: () => apiClient.get<RunSummary[]>('/runs').then((res: { data: RunSummary[] }) => res.data),
+  get: (id: string) => apiClient.get<RunDetail>(`/runs/${id}`).then((res: { data: RunDetail }) => res.data),
   create: (projectId: string, data: RunCreate) =>
-    apiClient.post<RunCreateResponse>(`/projects/${projectId}/runs`, data).then((res) => res.data),
+    apiClient.post<RunCreateResponse>(`/projects/${projectId}/runs`, data).then((res: { data: RunCreateResponse }) => res.data),
   getResults: (id: string) =>
-    apiClient.get(`/runs/${id}/results`).then((res) => res.data),
+    apiClient.get(`/runs/${id}/results`).then((res: { data: unknown }) => res.data),
   getLegal: (id: string) =>
-    apiClient.get(`/runs/${id}/legal`).then((res) => res.data),
+    apiClient.get(`/runs/${id}/legal`).then((res: { data: unknown }) => res.data),
   export: (id: string) =>
-    apiClient.get(`/runs/${id}/export`, { responseType: 'blob' }).then((res) => res.data),
+    apiClient.get(`/runs/${id}/export`, { responseType: 'blob' }).then((res: { data: Blob }) => res.data),
   getBiodiversityLayer: (id: string, layer: string) =>
-    apiClient.get<GeoJSON.FeatureCollection>(`/runs/${id}/biodiversity/${layer}`).then((res) => res.data),
+    apiClient.get<GeoJSON.FeatureCollection>(`/runs/${id}/biodiversity/${layer}`).then((res: { data: GeoJSON.FeatureCollection }) => res.data),
 }
 
 export const tasksApi = {
   getStatus: (taskId: string) =>
-    apiClient.get<TaskStatus>(`/tasks/${taskId}`).then((res) => res.data),
+    apiClient.get<TaskStatus>(`/tasks/${taskId}`).then((res: { data: TaskStatus }) => res.data),
   cancel: (taskId: string) =>
-    apiClient.delete(`/tasks/${taskId}`).then((res) => res.data),
+    apiClient.delete(`/tasks/${taskId}`).then((res: { data: unknown }) => res.data),
 }
 
