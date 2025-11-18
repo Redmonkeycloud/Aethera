@@ -41,15 +41,18 @@
 - ✅ Integrate with backend orchestrator to append biodiversity findings and legal determinations to run outputs.
 - ✅ Implement legal rules for multiple countries (DEU, FRA, ITA, GRC) with comprehensive source documentation.
 
-### Phase 5 – Backend API & Orchestration
+### Phase 5 – Backend API & Orchestration ✅ COMPLETE
 **Goals**
-- Create FastAPI service with endpoints:
-  - `POST /projects`
-  - `POST /projects/{id}/runs`
-  - `GET /runs/{id}`
-  - `GET /runs/{id}/results`
-- Integrate Celery workers for heavy tasks; store metadata in Postgres/PostGIS.
-- Implement storage abstraction for rasters/exports (local filesystem initially, S3-compatible later).
+- ✅ Create FastAPI service with endpoints:
+  - ✅ `POST /projects`
+  - ✅ `POST /projects/{id}/runs` (async task queue)
+  - ✅ `GET /runs/{id}`
+  - ✅ `GET /runs/{id}/results` (comprehensive results)
+  - ✅ `GET /runs/{id}/legal` (legal compliance)
+  - ✅ `GET /runs/{id}/export` (ZIP download)
+  - ✅ `GET /tasks/{task_id}` (task status polling)
+- ✅ Integrate Celery workers for heavy tasks with Redis backend.
+- ✅ Implement storage abstraction for rasters/exports (local filesystem and S3-compatible).
 
 ### Phase 6 – Frontend Application
 **Goals**
