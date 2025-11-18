@@ -185,15 +185,20 @@ python -m backend.src.main_controller \
   --country DEU
 ```
 
-## Phase 5: Backend API & Orchestration 🟡 ~60%
+## Phase 5: Backend API & Orchestration ✅ COMPLETE
 
 ### Completed
-- ✅ FastAPI service with basic endpoints:
+- ✅ FastAPI service with comprehensive endpoints:
   - `GET /` - Redirects to `/docs`
   - `GET /health` - Health check
   - `GET /projects` / `POST /projects` - Project management
+  - `GET /projects/{id}` - Get project details
+  - `POST /projects/{id}/runs` - Trigger new analysis run (async)
   - `GET /runs` - List runs
   - `GET /runs/{run_id}` - Get run details
+  - `GET /runs/{run_id}/results` - Comprehensive results endpoint
+  - `GET /runs/{run_id}/legal` - Legal compliance results endpoint
+  - `GET /runs/{run_id}/export` - Export package download (ZIP)
   - `GET /runs/{run_id}/biodiversity/{layer}` - Biodiversity GeoJSON layers
   - `GET /countries` - List available countries
   - `GET /countries/{code}/bounds` - Get country boundaries
@@ -204,18 +209,27 @@ python -m backend.src.main_controller \
   - `GET /runs/{run_id}/indicators/cim` - CIM predictions
   - `GET /cache/stats` - Dataset cache statistics
   - `POST /cache/clear` - Clear dataset cache
+  - `GET /tasks/{task_id}` - Get task status (polling)
+  - `DELETE /tasks/{task_id}` - Cancel task
 - ✅ CORS middleware for frontend access
 - ✅ Run manifest storage (`RunManifestStore`)
 - ✅ Project storage (`ProjectStore`)
-
-### Missing
-- ❌ `POST /projects/{id}/runs` - Trigger new analysis run
-- ❌ `GET /runs/{id}/results` - Comprehensive results endpoint
-- ❌ `GET /runs/{id}/legal` - Legal compliance results endpoint
-- ❌ `GET /runs/{id}/export` - Export package download
-- ❌ Celery workers for async task processing
-- ❌ Storage abstraction (currently local filesystem only, S3-compatible backend needed)
-- ❌ Task status tracking and polling
+- ✅ **Storage abstraction layer** (`backend/src/storage/`):
+  - Abstract storage interface
+  - Local filesystem backend
+  - S3-compatible backend (with boto3)
+  - Factory pattern for backend creation
+- ✅ **Celery workers** (`backend/src/workers/`):
+  - Async task processing
+  - Analysis pipeline execution
+  - Task state tracking
+  - Progress updates
+  - Error handling
+- ✅ **Task tracking** (`backend/src/workers/task_tracker.py`):
+  - Real-time status retrieval
+  - Progress metadata extraction
+  - Task cancellation
+  - Status polling support
 
 ## Phase 6: Frontend Application ❌ 0%
 
