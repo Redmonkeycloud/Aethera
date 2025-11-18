@@ -1,4 +1,4 @@
-from . import biodiversity, projects, runs, tasks
+from . import biodiversity, layers, projects, runs, tasks
 
-__all__ = ["biodiversity", "projects", "runs", "tasks"]
+__all__ = ["biodiversity", "layers", "projects", "runs", "tasks"]
 

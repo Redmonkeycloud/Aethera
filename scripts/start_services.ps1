@@ -8,49 +8,73 @@ param(
     [string]$ApiHost = "localhost"
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 Write-Host "Starting AETHERA Services..." -ForegroundColor Green
 Write-Host ""
 
-# Check if Redis is already running
+# Check if Redis is already running (check Docker first, then local)
 Write-Host "Checking Redis..." -ForegroundColor Yellow
+$redisRunning = $false
+
+# Check Docker Redis
 try {
-    $redisCheck = redis-cli ping 2>&1
-    if ($LASTEXITCODE -eq 0 -and $redisCheck -eq "PONG") {
-        Write-Host "✓ Redis is already running" -ForegroundColor Green
-    } else {
-        Write-Host "Starting Redis server..." -ForegroundColor Yellow
-        if ($Background) {
-            Start-Process redis-server -WindowStyle Hidden
-            Start-Sleep -Seconds 2
-            Write-Host "✓ Redis started in background" -ForegroundColor Green
-        } else {
-            Write-Host "Starting Redis in new window..." -ForegroundColor Yellow
-            Start-Process redis-server
-            Start-Sleep -Seconds 2
-        }
+    $dockerCheck = docker exec aethera-redis redis-cli ping 2>&1
+    if ($LASTEXITCODE -eq 0 -and $dockerCheck -match "PONG") {
+        Write-Host "✓ Redis is running in Docker" -ForegroundColor Green
+        $redisRunning = $true
     }
 } catch {
-    Write-Host "⚠ Redis not found. Please install Redis or start it manually." -ForegroundColor Red
-    Write-Host "  Download: https://redis.io/download" -ForegroundColor Gray
+    # Docker Redis not running, continue
+}
+
+# Check local Redis if Docker Redis is not running
+if (-not $redisRunning) {
+    try {
+        $redisCheck = redis-cli ping 2>&1
+        if ($LASTEXITCODE -eq 0 -and $redisCheck -match "PONG") {
+            Write-Host "✓ Redis is already running locally" -ForegroundColor Green
+            $redisRunning = $true
+        }
+    } catch {
+        # Redis not found locally
+    }
+}
+
+# If Redis is not running, try to start Docker Redis
+if (-not $redisRunning) {
+    Write-Host "Redis is not running. Checking if Docker Redis container exists..." -ForegroundColor Yellow
+    try {
+        $containerCheck = docker ps -a --filter "name=aethera-redis" --format "{{.Names}}" 2>&1
+        if ($containerCheck -match "aethera-redis") {
+            Write-Host "Starting existing Docker Redis container..." -ForegroundColor Yellow
+            docker start aethera-redis 2>&1 | Out-Null
+            Start-Sleep -Seconds 2
+            Write-Host "✓ Redis started from Docker container" -ForegroundColor Green
+        } else {
+            Write-Host "⚠ Redis is not running. Please start it manually:" -ForegroundColor Red
+            Write-Host "  docker run -d -p 6379:6379 --name aethera-redis redis:7-alpine" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "Continuing anyway - services may fail if Redis is not available..." -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "⚠ Could not check Docker. Please ensure Redis is running on port $RedisPort" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
 
 # Start Celery worker
 Write-Host "Starting Celery worker..." -ForegroundColor Yellow
-$celeryScript = @"
-cd $PSScriptRoot\..
-celery -A backend.src.workers.celery_app worker --loglevel=info
-"@
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$celeryScript = "cd '$projectRoot'; .\backend\venv\Scripts\Activate.ps1; celery -A backend.src.workers.celery_app worker --loglevel=info"
 
 if ($Background) {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $celeryScript
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $celeryScript)
     Write-Host "✓ Celery worker started in background window" -ForegroundColor Green
 } else {
     Write-Host "Starting Celery worker in new window..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $celeryScript
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $celeryScript)
     Start-Sleep -Seconds 2
 }
 
@@ -58,17 +82,14 @@ Write-Host ""
 
 # Start FastAPI server
 Write-Host "Starting FastAPI server..." -ForegroundColor Yellow
-$apiScript = @"
-cd $PSScriptRoot\..
-uvicorn backend.src.api.app:app --host $ApiHost --port $ApiPort --reload
-"@
+$apiScript = "cd '$projectRoot'; .\backend\venv\Scripts\Activate.ps1; uvicorn backend.src.api.app:app --host $ApiHost --port $ApiPort --reload"
 
 if ($Background) {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $apiScript
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $apiScript)
     Write-Host "✓ FastAPI server started in background window" -ForegroundColor Green
 } else {
     Write-Host "Starting FastAPI server in new window..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $apiScript
+    Start-Process powershell -ArgumentList @("-NoExit", "-Command", $apiScript)
     Start-Sleep -Seconds 2
 }
 
@@ -90,4 +111,3 @@ if (-not $Background) {
     Write-Host "Press any key to exit this script (services will continue running)..." -ForegroundColor Gray
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-
