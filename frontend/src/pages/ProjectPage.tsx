@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { projectsApi, runsApi } from '../api/client'
+import { projectsApi, runsApi, type RunSummary } from '../api/client'
 import MapView, { useMapInstance } from '../components/Map/MapView'
 import AoiDrawTool from '../components/Map/AoiDrawTool'
 import AoiDisplay from '../components/Map/AoiDisplay'
@@ -20,7 +20,7 @@ export default function ProjectPage() {
   
   // Memoize the map load handler to prevent re-renders
   const memoizedHandleMapLoad = React.useCallback(handleMapLoad, [])
-  const { aoiGeometry, setSelectedProject } = useAppStore()
+  const { setSelectedProject } = useAppStore()
   const [drawingEnabled, setDrawingEnabled] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [layers, setLayers] = useState([
@@ -37,7 +37,7 @@ export default function ProjectPage() {
 
   const { data: runs } = useQuery({
     queryKey: ['runs', projectId],
-    queryFn: () => runsApi.list().then((runs) => runs.filter((r) => r.project_id === projectId)),
+    queryFn: () => runsApi.list().then((runs: RunSummary[]) => runs.filter((r: RunSummary) => r.project_id === projectId)),
     enabled: !!projectId,
   })
 
@@ -70,8 +70,8 @@ export default function ProjectPage() {
   }
 
   const handleLayerToggle = (layerId: string, visible: boolean) => {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === layerId ? { ...l, visible } : l))
+    setLayers((prev: typeof layers) =>
+      prev.map((l: typeof layers[0]) => (l.id === layerId ? { ...l, visible } : l))
     )
   }
 
@@ -159,7 +159,7 @@ export default function ProjectPage() {
             <div>
               <h2 className="font-semibold mb-2">Previous Runs</h2>
               <div className="space-y-2">
-                {runs.map((run) => (
+                    {runs.map((run: RunSummary) => (
                   <button
                     key={run.run_id}
                     onClick={() => navigate(`/runs/${run.run_id}`)}

@@ -67,7 +67,7 @@ Write-Host ""
 # Start Celery worker
 Write-Host "Starting Celery worker..." -ForegroundColor Yellow
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$celeryScript = "cd '$projectRoot'; .\backend\venv\Scripts\Activate.ps1; celery -A backend.src.workers.celery_app worker --loglevel=info"
+$celeryScript = "cd '$projectRoot'; .\backend\venv\Scripts\Activate.ps1; celery -A backend.src.workers.celery_app worker --pool=solo --loglevel=info"
 
 if ($Background) {
     Start-Process powershell -ArgumentList @("-NoExit", "-Command", $celeryScript)

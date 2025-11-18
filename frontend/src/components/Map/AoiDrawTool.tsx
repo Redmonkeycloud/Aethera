@@ -19,13 +19,20 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
   useEffect(() => {
     if (!map) return
 
+    let cleanupFn: (() => void) | null = null
+
     // Wait for map to be fully loaded before setting up
     const setupDrawing = () => {
       if (!map || !map.loaded()) {
         return () => {} // Return empty cleanup
       }
 
-      // Clean up previous state
+      // Clean up previous state first
+      if (cleanupFn) {
+        cleanupFn()
+        cleanupFn = null
+      }
+
       if (map.getLayer(layerId)) {
         map.removeLayer(layerId)
       }
@@ -44,7 +51,9 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
 
       if (!enabled) {
         // Just cleanup, don't set up drawing
-        map.getCanvas().style.cursor = 'default'
+        if (map.getCanvas()) {
+          map.getCanvas().style.cursor = 'default'
+        }
         return () => {}
       }
 
@@ -139,7 +148,7 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
       map.on('dblclick', handleDblClick)
 
       // Return cleanup function
-      return () => {
+      const cleanup = () => {
         map.off('click', handleClick)
         map.off('dblclick', handleDblClick)
         if (map.getCanvas()) {
@@ -150,28 +159,39 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
           markerRef.current = null
         }
       }
+      cleanupFn = cleanup
+      return cleanup
     }
 
     if (map.loaded()) {
-      return setupDrawing()
+      cleanupFn = setupDrawing()
     } else {
-      let cleanup: (() => void) | null = null
       const onLoad = () => {
-        cleanup = setupDrawing()
+        cleanupFn = setupDrawing()
       }
       map.once('load', onLoad)
       // Also try after a short delay in case the event already fired
       const timer = setTimeout(() => {
-        if (map.loaded() && !cleanup) {
-          cleanup = setupDrawing()
+        if (map.loaded() && !cleanupFn) {
+          cleanupFn = setupDrawing()
         }
       }, 100)
+      
       return () => {
         clearTimeout(timer)
         map.off('load', onLoad)
-        if (cleanup) {
-          cleanup()
+        if (cleanupFn) {
+          cleanupFn()
+          cleanupFn = null
         }
+      }
+    }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (cleanupFn) {
+        cleanupFn()
+        cleanupFn = null
       }
     }
   }, [map, enabled, setAoiGeometry])

@@ -18,10 +18,10 @@ export default function BaseLayers({ map }: BaseLayersProps) {
     // Check which layers are available
     axios
       .get<Record<string, boolean>>(`${API_BASE_URL}/layers/available`)
-      .then((response) => {
+      .then((response: { data: Record<string, boolean> }) => {
         setAvailableLayers(response.data)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.warn('Could not check available layers:', err)
       })
   }, [map])
@@ -29,25 +29,30 @@ export default function BaseLayers({ map }: BaseLayersProps) {
   // Auto-load available layers
   useEffect(() => {
     if (!map || !map.loaded()) return
+    if (Object.keys(availableLayers).length === 0) return // Wait for availability check
 
     const loadLayer = async (layerName: 'natura2000' | 'corine') => {
+      const sourceId = `base-${layerName}`
+      if (map.getSource(sourceId)) return // Already loaded
       if (loadedLayers.has(layerName)) return
 
       try {
-        const response = await axios.get<GeoJSON.FeatureCollection>(
+        const response = await axios.get<{
+          type: string
+          features: unknown[]
+        }>(
           `${API_BASE_URL}/layers/${layerName}`,
           {
             responseType: 'json',
           }
         )
 
-        const sourceId = `base-${layerName}`
         const layerId = `base-${layerName}-layer`
 
         if (!map.getSource(sourceId)) {
           map.addSource(sourceId, {
             type: 'geojson',
-            data: response.data,
+            data: response.data as GeoJSON.FeatureCollection,
           })
 
           // Add fill layer
@@ -73,7 +78,11 @@ export default function BaseLayers({ map }: BaseLayersProps) {
             },
           })
 
-          setLoadedLayers((prev) => new Set(prev).add(layerName))
+          setLoadedLayers((prev) => {
+            const newSet = new Set(prev)
+            newSet.add(layerName)
+            return newSet
+          })
         }
       } catch (err) {
         console.error(`Failed to load ${layerName} layer:`, err)
@@ -81,12 +90,13 @@ export default function BaseLayers({ map }: BaseLayersProps) {
     }
 
     if (availableLayers.natura2000 && !loadedLayers.has('natura2000')) {
-      loadLayer('natura2000')
+      void loadLayer('natura2000')
     }
     if (availableLayers.corine && !loadedLayers.has('corine')) {
-      loadLayer('corine')
+      void loadLayer('corine')
     }
-  }, [map, availableLayers, loadedLayers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, availableLayers])
 
   return null
 }

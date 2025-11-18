@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { projectsApi } from '../api/client'
+import { projectsApi, type Project } from '../api/client'
 import { format } from 'date-fns'
 
 export default function HomePage() {
@@ -42,7 +42,7 @@ export default function HomePage() {
         </div>
       ) : projects && projects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
+          {projects.map((project: Project) => (
             <Link
               key={project.id}
               to={`/projects/${project.id}`}
