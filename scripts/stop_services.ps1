@@ -8,7 +8,7 @@ Write-Host ""
 # Stop Redis
 Write-Host "Stopping Redis..." -ForegroundColor Yellow
 try {
-    $redisCheck = redis-cli shutdown 2>&1
+    $null = redis-cli shutdown 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✓ Redis stopped" -ForegroundColor Green
     } else {
