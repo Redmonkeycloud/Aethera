@@ -77,16 +77,19 @@ async def get_corine_layer() -> Response:
 async def list_available_layers() -> dict[str, bool]:
     """List which base layers are available."""
     catalog = get_catalog()
+    natura_available = False
+    corine_available = False
+    
     try:
         natura_path = catalog.natura2000()
         natura_available = natura_path is not None and natura_path.exists()
-    except Exception:
+    except (FileNotFoundError, AttributeError, Exception):
         natura_available = False
     
     try:
         corine_path = catalog.corine()
-        corine_available = corine_path.exists()
-    except Exception:
+        corine_available = corine_path.exists() if corine_path else False
+    except (FileNotFoundError, AttributeError, Exception):
         corine_available = False
     
     return {

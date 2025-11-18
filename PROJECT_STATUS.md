@@ -2,8 +2,8 @@
 
 This document tracks the overall project completion status and progress across all implementation phases.
 
-**Last Updated**: 2025-01-01  
-**Overall Completion**: ~75-80%
+**Last Updated**: 2025-01-27  
+**Overall Completion**: ~85-90%
 
 ## Phase Completion Summary
 
@@ -15,7 +15,7 @@ This document tracks the overall project completion status and progress across a
 | **Phase 3: AI/ML Models** | ✅ Complete | 100% | RESM, AHSM, CIM, Biodiversity models + training pipelines |
 | **Phase 4: Biodiversity AI & Legal Rules Engine** | ✅ Complete | 100% | Legal rules for 4 countries, parser/evaluator, integration |
 | **Phase 5: Backend API & Orchestration** | ✅ Complete | 100% | Full API, Celery workers, storage abstraction, service automation |
-| **Phase 6: Frontend Application** | ❌ Not Started | 0% | Placeholder only |
+| **Phase 6: Frontend Application** | ✅ Complete | 100% | React + TypeScript + Vite, MapLibre GL JS, full UI |
 | **Phase 7: Reporting & Learning** | 🟡 Partial | ~30% | Templates exist, RAG not implemented |
 
 ## Phase 0: Foundation & Infrastructure ✅ 100%
@@ -200,6 +200,9 @@ python -m backend.src.main_controller \
   - `GET /runs/{run_id}/legal` - Legal compliance results endpoint
   - `GET /runs/{run_id}/export` - Export package download (ZIP)
   - `GET /runs/{run_id}/biodiversity/{layer}` - Biodiversity GeoJSON layers
+  - `GET /layers/natura2000` - Natura 2000 protected areas layer
+  - `GET /layers/corine` - CORINE Land Cover layer
+  - `GET /layers/available` - List available base layers
   - `GET /countries` - List available countries
   - `GET /countries/{code}/bounds` - Get country boundaries
   - `GET /runs/{run_id}/indicators/receptor-distances` - Receptor distances
@@ -236,23 +239,76 @@ python -m backend.src.main_controller \
   - Service status checking
   - Stop scripts for clean shutdown
   - Comprehensive setup documentation (`docs/SERVICES_SETUP.md`)
+- ✅ **Base Layers API** (`backend/src/api/routes/layers.py`):
+  - Lazy initialization of DatasetCatalog to avoid import-time errors
+  - GPKG/Shapefile to GeoJSON conversion
+  - Automatic CRS transformation to WGS84
+  - Layer availability checking
+  - Error handling for missing datasets
 
-## Phase 6: Frontend Application ❌ 0%
+## Phase 6: Frontend Application ✅ 100%
 
-### Status
-- Placeholder README only
-- No implementation started
+### Completed
+- ✅ **React + Vite + TypeScript setup** (`frontend/`)
+  - Modern build tooling with Vite
+  - TypeScript for type safety
+  - Tailwind CSS for styling
+  - ESLint configuration
+- ✅ **MapLibre GL JS integration** (`frontend/src/components/Map/`)
+  - MapView component with proper initialization
+  - Resize handling and container management
+  - Base map tiles (OpenStreetMap)
+- ✅ **AOI Management**:
+  - AOI drawing tool (click to add points, double-click to finish)
+  - AOI upload component (GeoJSON file upload)
+  - Coordinate input component (bounding box or polygon coordinates)
+  - AOI display component (visualizes current AOI on map)
+- ✅ **Base Layers** (`frontend/src/components/Map/BaseLayers.tsx`):
+  - Automatic loading of Natura2000 and CORINE layers
+  - Layer availability checking via API
+  - Dynamic layer styling (colors, opacity)
+- ✅ **Layer Controls** (`frontend/src/components/Map/LayerControl.tsx`):
+  - Toggle layer visibility
+  - Layer list management
+- ✅ **Scenario Form** (`frontend/src/components/ScenarioForm.tsx`):
+  - Project type selection
+  - Country selection
+  - Configuration options
+  - Run submission
+- ✅ **Run Status Polling** (`frontend/src/components/RunStatusPolling.tsx`):
+  - Real-time task status updates
+  - Progress tracking
+  - Completion/error handling
+- ✅ **Indicator Panels** (`frontend/src/components/IndicatorPanel.tsx`):
+  - Display of analysis results
+  - Environmental KPIs
+  - Model predictions
+- ✅ **Result Download** (`frontend/src/components/ResultDownload.tsx`):
+  - Export package download
+  - Result file access
+- ✅ **Pages**:
+  - HomePage - Project listing
+  - NewProjectPage - Project creation
+  - ProjectPage - Project details, AOI management, run creation
+  - RunPage - Run results visualization
+- ✅ **State Management**:
+  - Zustand store for global state
+  - TanStack Query for data fetching
+- ✅ **API Client** (`frontend/src/api/client.ts`):
+  - Axios-based API client
+  - Error handling and timeouts
+  - Request/response interceptors
+- ✅ **Error Handling**:
+  - User-friendly error messages
+  - Connection timeout handling
+  - API error display
 
-### Required
-- React + Vite + TypeScript setup
-- MapLibre GL JS integration
-- AOI upload/draw tool
-- Scenario form
-- Layer controls
-- Indicator panels
-- Result download area
-- Run status polling
-- Map layer management
+### Technical Details
+- React Router v6 with future flags enabled
+- MapLibre GL JS v3 for map rendering
+- Turf.js for geospatial operations
+- React Dropzone for file uploads
+- Date-fns for date formatting
 
 ## Phase 7: Reporting, Learning Memory & Automation 🟡 ~30%
 
