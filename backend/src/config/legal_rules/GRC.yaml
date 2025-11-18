@@ -1,0 +1,164 @@
+# Legal Rules for Greece (GRC)
+# EIA-specific regulations and compliance requirements
+
+country_code: GRC
+country_name: Greece
+version: "1.0.0"
+metadata:
+  jurisdiction: "Hellenic Republic"
+  applicable_laws:
+    - "Law 4014/2011 (Environmental Licensing)"
+    - "Directive 2014/52/EU (EU EIA Directive)"
+    - "Directive 92/43/EEC (Habitats Directive)"
+    - "Law 1650/1986 (Environmental Protection)"
+  last_updated: "2025-01-01"
+  sources:
+    - "Law 4014/2011 (Environmental Licensing)"
+    - "Law 1650/1986 (Environmental Protection)"
+    - "Forest Law (Νόμος 998/1979)"
+    - "Directive 2014/52/EU"
+    - "Directive 92/43/EEC (Habitats Directive)"
+    - "Directive 2000/60/EC (Water Framework Directive)"
+
+rules:
+  # EIA Thresholds (Law 4014/2011, Annex)
+  - id: "grc_eia_solar_threshold"
+    name: "Solar Power Plant EIA Threshold"
+    description: "Solar power plants exceeding 50 MW require mandatory EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "solar"
+        - capacity_mw:
+            ">": 50
+    message_template: "Solar power plant capacity ({capacity_mw} MW) exceeds 50 MW threshold. Mandatory EIA required under Law 4014/2011."
+    references:
+      - "Law 4014/2011, Annex A"
+      - "Directive 2014/52/EU, Annex I"
+
+  - id: "grc_eia_wind_threshold"
+    name: "Wind Power Plant EIA Threshold"
+    description: "Wind power plants exceeding 25 MW require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "wind"
+        - capacity_mw:
+            ">": 25
+    message_template: "Wind power plant capacity ({capacity_mw} MW) exceeds 25 MW threshold. Mandatory EIA required."
+    references:
+      - "Law 4014/2011, Annex A"
+
+  - id: "grc_eia_area_threshold"
+    name: "Project Area EIA Threshold"
+    description: "Projects affecting more than 100 hectares require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      aoi_area_ha:
+        ">": 100
+    message_template: "Project area ({aoi_area_ha:.1f} ha) exceeds 100 ha threshold. Mandatory EIA required."
+    references:
+      - "Law 4014/2011, Annex A"
+
+  # Biodiversity & Protected Areas
+  - id: "grc_bio_natura_assessment"
+    name: "Natura 2000 Appropriate Assessment"
+    description: "Projects affecting Natura 2000 sites require appropriate assessment"
+    category: "biodiversity"
+    severity: "critical"
+    condition:
+      protected_overlap_pct:
+        ">": 0
+    message_template: "Project overlaps {protected_overlap_pct:.2f}% of Natura 2000 site. Appropriate assessment (Άρθρο 6(3)) required under Law 1650/1986."
+    references:
+      - "Directive 92/43/EEC, Article 6(3)"
+      - "Law 1650/1986, Article 18"
+
+  - id: "grc_bio_protected_buffer"
+    name: "Protected Area Buffer Zone"
+    description: "Projects within 2km of protected areas require enhanced assessment"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      distance_to_protected_km:
+        "<": 2.0
+    message_template: "Project is {distance_to_protected_km:.2f} km from protected area. Enhanced biodiversity assessment required."
+    references:
+      - "Law 1650/1986"
+
+  - id: "grc_bio_forest_protection"
+    name: "Forest Area Protection"
+    description: "Forest conversion requires special authorization in Greece"
+    category: "biodiversity"
+    severity: "critical"
+    condition:
+      and:
+        - forest_ratio:
+            ">": 0.2
+        - aoi_area_ha:
+            ">": 0.1
+    message_template: "Project affects {forest_ratio:.1%} forest cover ({aoi_area_ha:.1f} ha). Forest conversion authorization required under Forest Law."
+    references:
+      - "Forest Law (Νόμος 998/1979)"
+
+  # Water Protection
+  - id: "grc_water_proximity"
+    name: "Water Body Proximity"
+    description: "Projects within 100m of water bodies require water impact assessment"
+    category: "water"
+    severity: "high"
+    condition:
+      distance_to_water_km:
+        "<": 0.1
+    message_template: "Project is {distance_to_water_km:.2f} km from water body. Water impact assessment required."
+    references:
+      - "Law 1650/1986"
+      - "Directive 2000/60/EC (Water Framework Directive)"
+
+  # Emissions
+  - id: "grc_emissions_climate"
+    name: "Climate Impact Assessment"
+    description: "Projects exceeding 50,000 tCO2e/year require climate impact assessment"
+    category: "emissions"
+    severity: "high"
+    condition:
+      project_operation_tco2e_per_year:
+        ">": 50000
+    message_template: "Project emissions ({project_operation_tco2e_per_year:.0f} tCO2e/year) exceed threshold. Climate impact assessment required."
+    references:
+      - "Law 4014/2011"
+
+  # Land Use
+  - id: "grc_land_use_agricultural"
+    name: "Agricultural Land Protection"
+    description: "Conversion of agricultural land exceeding 5 ha requires assessment"
+    category: "land_use"
+    severity: "medium"
+    condition:
+      and:
+        - agricultural_ratio:
+            ">": 0.5
+        - aoi_area_ha:
+            ">": 5
+    message_template: "Project converts {agricultural_ratio:.1%} agricultural land ({aoi_area_ha:.1f} ha). Agricultural impact assessment required."
+    references:
+      - "Law 4014/2011"
+
+  # Cumulative Impact
+  - id: "grc_cumulative_impact"
+    name: "Cumulative Impact Assessment"
+    description: "High cumulative impact requires comprehensive assessment"
+    category: "cumulative_impact"
+    severity: "critical"
+    condition:
+      cim_score:
+        ">": 70
+    message_template: "Cumulative impact score is {cim_score:.1f} (high). Comprehensive EIA required."
+    references:
+      - "Law 4014/2011, Article 3"
+

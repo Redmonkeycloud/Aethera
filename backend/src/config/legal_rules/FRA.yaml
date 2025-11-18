@@ -1,0 +1,181 @@
+# Legal Rules for France (FRA)
+# EIA-specific regulations and compliance requirements
+
+country_code: FRA
+country_name: France
+version: "1.0.0"
+metadata:
+  jurisdiction: "French Republic"
+  applicable_laws:
+    - "Code de l'environnement (Environmental Code)"
+    - "Directive 2014/52/EU (EU EIA Directive)"
+    - "Directive 92/43/CEE (Habitats Directive)"
+    - "Directive 2009/147/CE (Birds Directive)"
+    - "Loi sur l'eau (Water Law)"
+  last_updated: "2025-01-01"
+  sources:
+    - "Code de l'environnement, Article R122-2"
+    - "Loi sur l'eau"
+    - "Code forestier"
+    - "Directive 2014/52/EU"
+    - "Directive 92/43/CEE (Habitats Directive)"
+    - "Directive 2000/60/EC (Water Framework Directive)"
+
+rules:
+  # EIA Thresholds (Code de l'environnement, Article R122-2)
+  - id: "fra_eia_solar_threshold"
+    name: "Solar Power Plant EIA Threshold"
+    description: "Solar power plants exceeding 250 MW require mandatory EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "solar"
+        - capacity_mw:
+            ">": 250
+    message_template: "Solar power plant capacity ({capacity_mw} MW) exceeds 250 MW threshold. Mandatory EIA required under Code de l'environnement Article R122-2."
+    references:
+      - "Code de l'environnement, Article R122-2"
+      - "Directive 2014/52/EU, Annex I"
+
+  - id: "fra_eia_wind_threshold"
+    name: "Wind Power Plant EIA Threshold"
+    description: "Wind power plants exceeding 50 MW or with more than 5 turbines require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      and:
+        - project_type:
+            "==": "wind"
+        - capacity_mw:
+            ">": 50
+    message_template: "Wind power plant capacity ({capacity_mw} MW) exceeds 50 MW threshold. Mandatory EIA required."
+    references:
+      - "Code de l'environnement, Article R122-2"
+
+  - id: "fra_eia_area_threshold"
+    name: "Project Area EIA Threshold"
+    description: "Projects affecting more than 25 hectares require EIA"
+    category: "eia_threshold"
+    severity: "critical"
+    condition:
+      aoi_area_ha:
+        ">": 25
+    message_template: "Project area ({aoi_area_ha:.1f} ha) exceeds 25 ha threshold. Mandatory EIA required."
+    references:
+      - "Code de l'environnement, Article R122-2"
+
+  # Biodiversity & Protected Areas
+  - id: "fra_bio_natura_assessment"
+    name: "Natura 2000 Appropriate Assessment"
+    description: "Projects affecting Natura 2000 sites require appropriate assessment under Article 6(3) of Habitats Directive"
+    category: "biodiversity"
+    severity: "critical"
+    condition:
+      protected_overlap_pct:
+        ">": 0
+    message_template: "Project overlaps {protected_overlap_pct:.2f}% of Natura 2000 site. Appropriate assessment (Article 6(3)) required."
+    references:
+      - "Directive 92/43/CEE, Article 6(3)"
+      - "Code de l'environnement, Article L414-4"
+
+  - id: "fra_bio_protected_buffer"
+    name: "Protected Area Buffer Zone"
+    description: "Projects within 500m of protected areas require enhanced assessment"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      distance_to_protected_km:
+        "<": 0.5
+    message_template: "Project is {distance_to_protected_km:.2f} km from protected area. Enhanced biodiversity assessment required."
+    references:
+      - "Code de l'environnement, Article L411-1"
+
+  - id: "fra_bio_forest_protection"
+    name: "Forest Area Protection"
+    description: "Significant forest conversion requires compensation measures"
+    category: "biodiversity"
+    severity: "high"
+    condition:
+      and:
+        - forest_ratio:
+            ">": 0.25
+        - aoi_area_ha:
+            ">": 1
+    message_template: "Project affects {forest_ratio:.1%} forest cover ({aoi_area_ha:.1f} ha). Compensation measures required under Code forestier."
+    references:
+      - "Code forestier, Article L311-1"
+
+  # Water Protection
+  - id: "fra_water_proximity"
+    name: "Water Body Proximity"
+    description: "Projects within 200m of water bodies require water impact assessment"
+    category: "water"
+    severity: "high"
+    condition:
+      distance_to_water_km:
+        "<": 0.2
+    message_template: "Project is {distance_to_water_km:.2f} km from water body. Water impact assessment required under Loi sur l'eau."
+    references:
+      - "Loi sur l'eau, Article L214-1"
+      - "Directive 2000/60/CE (Water Framework Directive)"
+
+  - id: "fra_water_wetland"
+    name: "Wetland Protection"
+    description: "Projects affecting wetlands require special authorization"
+    category: "water"
+    severity: "critical"
+    condition:
+      and:
+        - water_ratio:
+            ">": 0.1
+        - aoi_area_ha:
+            ">": 0.5
+    message_template: "Project affects wetland area ({water_ratio:.1%} water cover, {aoi_area_ha:.1f} ha). Special authorization required."
+    references:
+      - "Loi sur l'eau, Article L211-1"
+
+  # Emissions
+  - id: "fra_emissions_climate"
+    name: "Climate Impact Assessment"
+    description: "Projects exceeding 100,000 tCO2e/year require climate impact assessment"
+    category: "emissions"
+    severity: "high"
+    condition:
+      project_operation_tco2e_per_year:
+        ">": 100000
+    message_template: "Project emissions ({project_operation_tco2e_per_year:.0f} tCO2e/year) exceed threshold. Climate impact assessment required."
+    references:
+      - "Loi relative à la transition énergétique"
+      - "Code de l'environnement, Article L229-25"
+
+  # Land Use
+  - id: "fra_land_use_agricultural"
+    name: "Agricultural Land Protection"
+    description: "Conversion of agricultural land exceeding 10 ha requires assessment"
+    category: "land_use"
+    severity: "medium"
+    condition:
+      and:
+        - agricultural_ratio:
+            ">": 0.5
+        - aoi_area_ha:
+            ">": 10
+    message_template: "Project converts {agricultural_ratio:.1%} agricultural land ({aoi_area_ha:.1f} ha). Agricultural impact assessment required."
+    references:
+      - "Code rural et de la pêche maritime"
+
+  # Cumulative Impact
+  - id: "fra_cumulative_impact"
+    name: "Cumulative Impact Assessment"
+    description: "High cumulative impact requires comprehensive assessment"
+    category: "cumulative_impact"
+    severity: "critical"
+    condition:
+      cim_score:
+        ">": 70
+    message_template: "Cumulative impact score is {cim_score:.1f} (high). Comprehensive EIA required."
+    references:
+      - "Code de l'environnement, Article R122-1"
+

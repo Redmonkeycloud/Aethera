@@ -10,9 +10,9 @@ AETHERA is an AI-assisted Environmental Impact Assessment (EIA) copilot. It inge
 ### System Layers
 1. **Data & Ingestion** – manages AOI input, datasets (CORINE, GADM, Natura, hazards, socio-economic), caching, and provenance.
 2. **Geospatial Processing Engine** – validates AOIs, clips base layers, performs overlays, distance/buffer analysis, and zonal statistics.
-3. **AI/ML Engine** – ✅ **FULLY IMPLEMENTED**: RESM (renewable suitability), AHSM (hazard susceptibility), CIM (cumulative impact), and Biodiversity AI (mandatory) with ensemble ML models and configuration-driven training/inference.
+3. **AI/ML Engine** – RESM (suitability), AHSM (hazard), CIM (cumulative/biodiversity) pipelines with configuration-driven training/inference.
 4. **Legal Rules Engine** – applies country-specific YAML/JSON logic for thresholds, buffers, and compliance statements.
-5. **Emissions & Indicators Engine** – ✅ **FULLY IMPLEMENTED**: computes baseline and project-induced emissions, distance-to-receptor calculations, fragmentation metrics, and 20+ scientifically-accurate environmental KPIs.
+5. **Emissions & Indicators Engine** – computes baseline and project-induced emissions, fragmentation metrics, and environmental KPIs.
 6. **Application Backend** – orchestrates project runs, exposes an API (FastAPI) for async jobs, stores outputs, and records logs/manifests.
 7. **Web Frontend** – interactive map/UI (TypeScript + React + MapLibre) for scenario setup, results exploration, and downloads.
 8. **Logging & Monitoring** – structured logs, run manifests, telemetry, and performance metrics for reproducibility.
@@ -91,150 +91,82 @@ AETHERA_2.0/
 Only placeholder files are committed so far; each component will be expanded iteratively. The backend already anticipates report-learning storage (history tables + embeddings) even though no past reports exist yet.
 
 ### Getting Started
-
-#### Quick Setup (Automated)
-
-**Linux/macOS:**
-```bash
-chmod +x scripts/setup_dev_env.sh
-./scripts/setup_dev_env.sh
-```
-
-**Windows (PowerShell):**
-```powershell
-.\scripts\setup_dev_env.ps1
-```
-
-#### Manual Setup
-
 1. **Python environment**
-   ```bash
-   # Using venv
-   python3.11 -m venv .venv
-   source .venv/bin/activate  # Windows: .venv\Scripts\activate
-   
-   # Or using uv (faster)
+   ```
    cd backend
-   uv venv .venv && source .venv/bin/activate
-   uv pip install -e ".[dev]"
+   uv venv .venv && .venv/Scripts/activate
+   uv pip install -e .
    ```
-
-2. **Install pre-commit hooks** (optional but recommended)
-   ```bash
-   pip install pre-commit
-   pre-commit install
+2. **Run CLI scaffold**
    ```
-
+   python -m src.main_controller --help
+   ```
 3. **Database (Docker)**
-   ```bash
-   docker compose up -d
-   cd backend
-   python -m src.db.init_db
+   ```
+   docker compose up -d db
+   python -m backend.src.db.init_db --dsn postgresql://aethera:aethera@localhost:55432/aethera
    ```
    Requires Docker Desktop + image build from `docker/postgres/Dockerfile` (PostGIS + pgvector). Update `.env` or `env.example` as needed.
-
 4. **Training data + external sources**
-   ```bash
+   ```
    python scripts/fetch_external_biodiversity_sources.py
    python scripts/build_biodiversity_training.py --samples 150
    ```
    The first command fetches OWID and GBIF datasets into `data2/biodiversity/external/`. The second command generates `data2/biodiversity/training.csv` derived from Natura 2000 + CORINE intersections.
-
 5. **API preview**
-   ```bash
-   cd backend
-   uvicorn src.api.app:app --reload
+   ```
+   uvicorn backend.src.api.app:app --reload
    ```
    - `POST /projects` – create a project record (stored in `data/projects.json`).
    - `GET /projects` – list projects.
    - `GET /runs` – list completed runs via `manifest.json` files.
    - `GET /runs/{run_id}/biodiversity/{layer}` – download GeoJSON layers (`sensitivity`, `natura`, `overlap`) for map rendering.
-   - `GET /runs/{run_id}/indicators/receptor-distances` – get distance-to-receptor analysis.
-   - `GET /runs/{run_id}/indicators/kpis` – get comprehensive environmental KPIs.
-   - `GET /runs/{run_id}/indicators/resm` – get RESM (renewable suitability) predictions.
-   - `GET /runs/{run_id}/indicators/ahsm` – get AHSM (hazard susceptibility) predictions.
-   - `GET /runs/{run_id}/indicators/cim` – get CIM (cumulative impact) predictions.
-   - `GET /cache/stats` – get dataset cache statistics.
-   - `POST /cache/clear` – clear the dataset cache.
-
 6. **Frontend (later)**
-   ```bash
+   ```
    cd frontend
    pnpm install
    pnpm dev
    ```
 
-#### Using Make (Linux/macOS)
-
-For convenience, use the Makefile:
-
-```bash
-make install-dev    # Install development dependencies
-make docker-up      # Start Docker services
-make db-init        # Initialize database
-make test           # Run tests
-make lint           # Run linting
-make format         # Format code
-```
-
-See `DEVELOPMENT.md` for detailed development guide.
-
-### Current Status
-
-**✅ Completed Phases:**
-- **Phase 0 (Foundation & Infrastructure)**: CI/CD pipeline, development environment standardization
-- **Phase 1 (Core Geospatial Pipeline)**: WKT support, comprehensive dataset caching mechanism
-- **Phase 2 (Emissions & Indicators)**: Distance-to-receptor calculations, advanced environmental KPIs (20+ indicators)
-- **Phase 3 (AI/ML Models)**: RESM, AHSM, CIM, and Biodiversity AI fully implemented with ensemble ML approaches, training pipelines, and MLflow/W&B integration
-
-**🚧 In Progress:**
-- Legal Rules Engine (Phase 4)
-- Async processing with Celery (Phase 5)
-- Report generation integration (Phase 7)
-
-### Training Models
-
-Train individual models or all models at once:
-
-```bash
-# Train individual model
-python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
-
-# Train all models
-python -m ai.training.train_all --training-data-dir data2
-
-# With MLflow tracking (default)
-python -m ai.training.train_biodiversity --training-data data2/biodiversity/training.csv
-
-# With Weights & Biases
-python -m ai.training.train_biodiversity --wandb --training-data data2/biodiversity/training.csv
-```
-
-See `docs/MLFLOW_WANDB_SETUP.md` for detailed setup instructions.
-
 ### Next Steps
-- Design and implement the legal rules DSL and prototype a single-country ruleset.
-- Stand up Celery workers for async processing.
-- Wire report generation into the main pipeline.
-- Create the modern frontend map UI (React + MapLibre) with AOI upload/drawing.
-
-### AI/ML Models
-
-All models support external training data with synthetic fallback:
-
-- **Biodiversity AI** (mandatory): Ensemble classification (Logistic Regression, Random Forest, Gradient Boosting)
-- **RESM** (Renewable/Resilience Suitability): Ensemble regression (Ridge, Random Forest, Gradient Boosting) - scores 0-100
-- **AHSM** (Asset Hazard Susceptibility): Ensemble classification for multi-hazard risk assessment (flood, wildfire, landslide)
-- **CIM** (Cumulative Impact Model): Integrates all other models and environmental KPIs for comprehensive impact assessment
-
-Place training datasets (CSV/Parquet) under `data2/biodiversity/`, `data2/resm/`, `data2/ahsm/`, or `data2/cim/`. The controller automatically discovers these files, uses them for model ensembles, and logs the dataset source in the `model_runs` table. If no dataset is found, models fall back to synthetic samples so the pipeline can still operate.
+- Flesh out `main_controller` orchestration (dataset download, AOI validation, CORINE clipping).
+- Implement GIS utilities (tiling, buffering, zonal stats).
+- Stand up FastAPI service with project/run endpoints and Celery workers.
+- Build RESM/AHSM/CIM training + inference scripts using the YAML configs.
+- ✅ Legal Rules Engine implemented with YAML/JSON format, parser/evaluator, and compliance status generation
+- ✅ Legal rules implemented for 4 countries (DEU, FRA, ITA, GRC) with comprehensive source documentation
+- ✅ Legal determinations integrated with backend orchestrator
+- Create the frontend map UI and data panels once backend APIs stabilize.
 
 ### Biodiversity Training Data
-`scripts/build_biodiversity_training.py` generates `training.csv` from Natura 2000 and CORINE overlays (official EU datasets).
+Place any curated biodiversity training dataset (CSV/Parquet) under `data2/biodiversity/`. `scripts/build_biodiversity_training.py` already generates `training.csv` from Natura 2000 and CORINE overlays (official EU datasets). The controller automatically discovers files such as `training.csv` or `training.parquet`, uses them for model ensembles, and logs the dataset source in the `model_runs` table. If no dataset is found, it falls back to synthetic samples so the pipeline can still operate.
 
 Additional vetted internet sources can be downloaded with `scripts/fetch_external_biodiversity_sources.py`, which currently pulls:
 - Our World in Data – *Biodiversity habitat loss (Williams et al. 2021)* (`data2/biodiversity/external/owid_biodiversity_habitat_loss.csv`).
 - GBIF occurrence samples for Italian raptors (`data2/biodiversity/external/gbif_occurrences_italy_raptors.csv`).
+
+### Legal Rules Engine
+
+The Legal Rules Engine evaluates project metrics against country-specific EIA regulations and compliance requirements. Rules are defined in YAML format and cover:
+
+- **EIA Thresholds**: Mandatory EIA requirements based on project capacity, area, and type
+- **Biodiversity & Protected Areas**: Natura 2000 site protection, buffer zones, forest protection
+- **Water Protection**: Water body proximity, wetland protection
+- **Emissions & Climate**: GHG emissions thresholds, climate impact assessment
+- **Land Use**: Agricultural land conversion, natural habitat protection
+- **Cumulative Impact**: Multi-factor impact assessment requirements
+
+**Available Countries**: Germany (DEU), France (FRA), Italy (ITA), Greece (GRC)
+
+**Usage**:
+```bash
+python -m backend.src.main_controller \
+  --aoi test_aoi.geojson \
+  --project-type solar \
+  --country DEU
+```
+
+Legal evaluation results are saved to `legal_evaluation.json` and included in the run manifest. See `docs/LEGAL_RULES_ENGINE.md` for detailed documentation and `docs/LEGAL_RULES_SOURCES.md` for comprehensive source bibliography.
 
 See `docs/` for detailed architecture and implementation plans.
 
