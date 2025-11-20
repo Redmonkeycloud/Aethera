@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { projectsApi, runsApi, type RunSummary } from '../api/client'
-import MapView, { useMapInstance } from '../components/Map/MapView'
-import AoiDrawTool from '../components/Map/AoiDrawTool'
+import MapView from '../components/Map/MapView'
+import { useMapInstance } from '../components/Map/useMapInstance'
 import AoiDisplay from '../components/Map/AoiDisplay'
 import BaseLayers from '../components/Map/BaseLayers'
 import LayerControl from '../components/Map/LayerControl'
@@ -19,12 +19,11 @@ export default function ProjectPage() {
   const { mapInstance, handleMapLoad } = useMapInstance()
   
   // Memoize the map load handler to prevent re-renders
-  const memoizedHandleMapLoad = React.useCallback(handleMapLoad, [])
+  const memoizedHandleMapLoad = React.useCallback(handleMapLoad, [handleMapLoad])
   const { setSelectedProject } = useAppStore()
-  const [drawingEnabled, setDrawingEnabled] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
-  const [layers, setLayers] = useState([
-    { id: 'aoi-draw-layer', name: 'AOI', visible: true },
+  const [layers, setLayers] = useState<Array<{ id: string; name: string; visible: boolean }>>([
+    { id: 'aoi-display-layer', name: 'AOI', visible: true },
   ])
 
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
@@ -54,6 +53,74 @@ export default function ProjectPage() {
       setSelectedProject(null)
     }
   }, [projectId, setSelectedProject])
+
+  // Discover layers from map
+  useEffect(() => {
+    if (!mapInstance || !mapInstance.loaded()) return
+
+    const discoverLayers = () => {
+      const discoveredLayers: Array<{ id: string; name: string; visible: boolean }> = []
+      
+      // Layer name mapping
+      const layerNames: Record<string, string> = {
+        'aoi-display-layer': 'AOI',
+        'base-natura2000-layer': 'Natura 2000',
+        'base-corine-layer': 'CORINE Land Cover',
+      }
+
+      // Check for known layers
+      const knownLayerIds = [
+        'aoi-display-layer',
+        'base-natura2000-layer',
+        'base-corine-layer',
+      ]
+
+      knownLayerIds.forEach((layerId) => {
+        const layer = mapInstance.getLayer(layerId)
+        if (layer) {
+          const visibility = mapInstance.getLayoutProperty(layerId, 'visibility') as string
+          discoveredLayers.push({
+            id: layerId,
+            name: layerNames[layerId] || layerId,
+            visible: visibility !== 'none',
+          })
+          console.log(`Discovered layer: ${layerId} (${layerNames[layerId] || layerId})`)
+        }
+      })
+
+      // Debug: log all layers on the map
+      const allLayers = mapInstance.getStyle()?.layers || []
+      console.log('All layers on map:', allLayers.map((l: { id: string }) => l.id))
+
+      // Always update layers state (even if empty, to show AOI at minimum)
+      setLayers(discoveredLayers.length > 0 ? discoveredLayers : [
+        { id: 'aoi-display-layer', name: 'AOI', visible: true }
+      ])
+    }
+
+    // Discover layers immediately
+    discoverLayers()
+
+    // Discover layers after delays to catch layers loaded asynchronously
+    const timer1 = setTimeout(discoverLayers, 500)
+    const timer2 = setTimeout(discoverLayers, 1500)
+    const timer3 = setTimeout(discoverLayers, 3000)
+    
+    // Also discover when map style/data loads
+    const handleStyleData = () => discoverLayers()
+    const handleData = () => discoverLayers()
+    
+    mapInstance.on('styledata', handleStyleData)
+    mapInstance.on('data', handleData)
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      mapInstance.off('styledata', handleStyleData)
+      mapInstance.off('data', handleData)
+    }
+  }, [mapInstance])
 
   const handleRunCreated = (taskId: string) => {
     setActiveTaskId(taskId)
@@ -130,15 +197,6 @@ export default function ProjectPage() {
           <div>
             <h2 className="font-semibold mb-2">Define Area of Interest (AOI)</h2>
             <div className="space-y-2">
-              <button
-                onClick={() => setDrawingEnabled(!drawingEnabled)}
-                className={`btn w-full ${
-                  drawingEnabled ? 'btn-primary' : 'btn-secondary'
-                }`}
-              >
-                {drawingEnabled ? 'Stop Drawing' : 'Start Drawing'}
-              </button>
-              <div className="text-xs text-gray-500 text-center">or</div>
               <AoiUpload />
               <div className="text-xs text-gray-500 text-center">or</div>
               <CoordinateInput />
@@ -192,7 +250,6 @@ export default function ProjectPage() {
             <>
               <BaseLayers map={mapInstance} />
               <AoiDisplay map={mapInstance} />
-              <AoiDrawTool map={mapInstance} enabled={drawingEnabled} />
               <LayerControl
                 map={mapInstance}
                 layers={layers}

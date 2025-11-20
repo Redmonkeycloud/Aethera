@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from ...config.base_settings import settings
@@ -189,10 +189,10 @@ async def log_metric(
 
 @router.get("/models/{model_name}/{version}/metrics")
 async def get_metrics(
-    model_name: str,
-    version: str | None = Query(None),
-    metric_name: str | None = Query(None),
-    dataset_split: str | None = Query(None),
+    model_name: str = Path(..., description="Model name"),
+    version: str = Path(..., description="Model version"),
+    metric_name: str | None = Query(None, description="Filter by metric name"),
+    dataset_split: str | None = Query(None, description="Filter by dataset split"),
     tracker: ValidationMetricsTracker = Depends(get_validation_tracker),
 ) -> dict[str, Any]:
     """Get validation metrics for a model."""

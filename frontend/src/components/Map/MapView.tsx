@@ -20,6 +20,18 @@ export default function MapView({
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
 
+  // Store latest values in refs to avoid re-initializing map
+  const onMapLoadRef = useRef(onMapLoad)
+  const initialCenterRef = useRef(initialCenter)
+  const initialZoomRef = useRef(initialZoom)
+
+  // Update refs when props change
+  useEffect(() => {
+    onMapLoadRef.current = onMapLoad
+    initialCenterRef.current = initialCenter
+    initialZoomRef.current = initialZoom
+  }, [onMapLoad, initialCenter, initialZoom])
+
   useEffect(() => {
     if (!mapContainer.current || map.current) return
 
@@ -71,8 +83,8 @@ export default function MapView({
               },
             ],
           },
-          center: initialCenter,
-          zoom: initialZoom,
+          center: initialCenterRef.current,
+          zoom: initialZoomRef.current,
         })
 
         const handleLoad = () => {
@@ -83,8 +95,8 @@ export default function MapView({
           if (map.current) {
             map.current.resize()
           }
-          if (onMapLoad && map.current) {
-            onMapLoad(map.current)
+          if (onMapLoadRef.current && map.current) {
+            onMapLoadRef.current(map.current)
           }
         }
 
@@ -130,17 +142,18 @@ export default function MapView({
       }
       setMapLoaded(false)
     }
-  }, []) // Empty dependency array - only initialize once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only initialize once - we use refs for prop values
 
   return (
     <div className="relative w-full h-full" style={{ height: '100%', width: '100%', position: 'relative' }}>
       <div 
         ref={mapContainer} 
         className="w-full h-full" 
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: '100%', width: '100%', position: 'relative', zIndex: 0 }}
       />
       {mapLoaded && children && (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
           {children}
         </div>
       )}
@@ -148,13 +161,4 @@ export default function MapView({
   )
 }
 
-export function useMapInstance() {
-  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
-
-  const handleMapLoad = (map: maplibregl.Map) => {
-    setMapInstance(map)
-  }
-
-  return { mapInstance, handleMapLoad }
-}
 

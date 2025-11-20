@@ -25,7 +25,10 @@ export default function LayerControl({ map, layers, onLayerToggle }: LayerContro
   }
 
   return (
-    <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 min-w-[200px]">
+    <div 
+      className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 min-w-[200px]"
+      style={{ pointerEvents: 'auto', zIndex: 1000 }}
+    >
       <div className="flex justify-between items-center mb-3">
         <h3 className="font-semibold text-gray-800">Layers</h3>
         <button

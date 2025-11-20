@@ -66,6 +66,16 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
         },
       })
 
+      // Find the best layer to add before (prefer aoi-display-layer if it exists, otherwise use simple-tiles)
+      let beforeId: string | undefined = 'simple-tiles'
+      if (map.getLayer('aoi-display-layer')) {
+        beforeId = 'aoi-display-layer'
+      } else if (map.getLayer('base-corine-layer')) {
+        beforeId = 'base-corine-layer'
+      } else if (map.getLayer('base-natura2000-layer')) {
+        beforeId = 'base-natura2000-layer'
+      }
+
       map.addLayer({
         id: layerId,
         type: 'fill',
@@ -74,7 +84,7 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
           'fill-color': '#3b82f6',
           'fill-opacity': 0.3,
         },
-      })
+      }, beforeId) // Add after base layers but before AOI display if it exists
 
       map.addLayer({
         id: `${layerId}-outline`,
@@ -84,10 +94,13 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
           'line-color': '#3b82f6',
           'line-width': 2,
         },
-      })
+      }, layerId) // Add after fill layer
 
       // Set cursor
       map.getCanvas().style.cursor = 'crosshair'
+
+      // Disable map dragging when drawing
+      map.dragPan.disable()
 
       const handleClick = (e: maplibregl.MapMouseEvent) => {
         if (!drawModeRef.current) {
@@ -151,6 +164,8 @@ export default function AoiDrawTool({ map, enabled }: AoiDrawToolProps) {
       const cleanup = () => {
         map.off('click', handleClick)
         map.off('dblclick', handleDblClick)
+        // Re-enable drag pan
+        map.dragPan.enable()
         if (map.getCanvas()) {
           map.getCanvas().style.cursor = 'default'
         }

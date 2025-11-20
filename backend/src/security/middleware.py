@@ -24,6 +24,15 @@ PUBLIC_ENDPOINTS = {
     "/auth/oauth/login",
     "/auth/refresh",
     "/metrics",
+    # API endpoints (can be made protected later)
+    "/projects",
+    "/runs",
+    "/tasks",
+    "/layers",
+    "/biodiversity",
+    "/reports",
+    "/observability",
+    "/governance",
 }
 
 
@@ -50,7 +59,19 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             Response
         """
         # Skip authentication for public endpoints
-        if request.url.path in PUBLIC_ENDPOINTS or request.url.path.startswith("/docs") or request.url.path.startswith("/openapi"):
+        if (
+            request.url.path in PUBLIC_ENDPOINTS
+            or request.url.path.startswith("/docs")
+            or request.url.path.startswith("/openapi")
+            or request.url.path.startswith("/projects")
+            or request.url.path.startswith("/runs")
+            or request.url.path.startswith("/tasks")
+            or request.url.path.startswith("/layers")
+            or request.url.path.startswith("/biodiversity")
+            or request.url.path.startswith("/reports")
+            or request.url.path.startswith("/observability")
+            or request.url.path.startswith("/governance")
+        ):
             return await call_next(request)
 
         # Get authorization header

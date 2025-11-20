@@ -18,14 +18,25 @@ export default function AoiUpload() {
           const geojson = JSON.parse(text)
 
           // Validate and extract geometry
+          let feature: GeoJSON.Feature | null = null
+          
           if (geojson.type === 'Feature') {
-            setAoiGeometry(geojson)
+            feature = geojson as GeoJSON.Feature
           } else if (geojson.type === 'FeatureCollection' && geojson.features.length > 0) {
-            setAoiGeometry(geojson.features[0])
+            feature = geojson.features[0] as GeoJSON.Feature
           } else if (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon') {
-            setAoiGeometry(turf.feature(geojson))
+            feature = turf.feature(geojson) as GeoJSON.Feature
           } else {
-            throw new Error('Invalid GeoJSON format')
+            throw new Error('Invalid GeoJSON format. Expected Feature, FeatureCollection, or Polygon/MultiPolygon')
+          }
+
+          if (feature && feature.geometry) {
+            console.log('[AoiUpload] Setting AOI geometry from upload:', feature)
+            console.log('[AoiUpload] Geometry type:', feature.geometry.type)
+            setAoiGeometry(feature)
+            alert('GeoJSON loaded successfully! The AOI should appear on the map.')
+          } else {
+            throw new Error('No valid geometry found in GeoJSON')
           }
         } catch (err) {
           alert('Failed to parse GeoJSON file: ' + (err instanceof Error ? err.message : 'Unknown error'))

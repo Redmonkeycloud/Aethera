@@ -55,7 +55,7 @@ export default function BaseLayers({ map }: BaseLayersProps) {
             data: response.data as GeoJSON.FeatureCollection,
           })
 
-          // Add fill layer
+          // Add fill layer (before AOI layers)
           map.addLayer({
             id: layerId,
             type: 'fill',
@@ -64,7 +64,7 @@ export default function BaseLayers({ map }: BaseLayersProps) {
               'fill-color': layerName === 'natura2000' ? '#ef4444' : '#10b981',
               'fill-opacity': layerName === 'natura2000' ? 0.2 : 0.15,
             },
-          })
+          }, 'simple-tiles') // Add after base tiles
 
           // Add outline layer
           map.addLayer({
@@ -76,13 +76,16 @@ export default function BaseLayers({ map }: BaseLayersProps) {
               'line-width': layerName === 'natura2000' ? 1.5 : 1,
               'line-opacity': 0.6,
             },
-          })
+          }, layerId) // Add after fill layer
 
           setLoadedLayers((prev) => {
             const newSet = new Set(prev)
             newSet.add(layerName)
             return newSet
           })
+
+          // Trigger a data event so layer discovery can pick it up
+          map.fire('data', { dataType: 'source' })
         }
       } catch (err) {
         console.error(`Failed to load ${layerName} layer:`, err)

@@ -90,8 +90,11 @@ export default function CoordinateInput({ onSuccess }: CoordinateInputProps) {
         properties: {},
       }
 
+      console.log('[CoordinateInput] Setting AOI geometry from coordinates:', feature)
+      console.log('[CoordinateInput] Geometry type:', feature.geometry.type)
       setAoiGeometry(feature)
       setError(null)
+      alert('Coordinates set successfully! The AOI should appear on the map.')
       if (onSuccess) {
         onSuccess()
       }

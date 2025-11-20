@@ -16,6 +16,9 @@ tmp/
 test_aoi*.geojson
 temp_*.geojson
 
+# GeoJSON samples folder (ignore GeoJSON files, but keep README)
+GeoJSON samples/*.geojson
+
 # Python
 __pycache__/
 *.py[cod]
