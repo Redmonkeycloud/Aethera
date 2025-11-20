@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from functools import wraps
 from typing import Any, Callable
@@ -207,7 +208,7 @@ def metrics_middleware(func: Callable) -> Callable:
             elif "geospatial" in func_name.lower() or "gis" in func_name.lower():
                 record_geospatial_operation(func_name, duration)
             return result
-        except Exception as e:
+        except Exception:
             duration = time.time() - start_time
             raise
 
@@ -224,11 +225,10 @@ def metrics_middleware(func: Callable) -> Callable:
             elif "geospatial" in func_name.lower() or "gis" in func_name.lower():
                 record_geospatial_operation(func_name, duration)
             return result
-        except Exception as e:
+        except Exception:
             duration = time.time() - start_time
             raise
 
-    import asyncio
     if asyncio.iscoroutinefunction(func):
         return async_wrapper
     return sync_wrapper

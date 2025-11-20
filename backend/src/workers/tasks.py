@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from .celery_app import celery_app
 from ..config.base_settings import settings
@@ -115,7 +116,7 @@ def run_analysis_task(
                 self.update_state(state="FAILURE", meta={"error": error_msg})
                 duration = time.time() - task_start_time
                 record_celery_task("aethera.run_analysis", "failed", duration)
-                span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                span.set_status(Status(StatusCode.ERROR, error_msg))
                 return {"status": "failed", "error": error_msg}
 
             # Extract run_id from output (assuming it's printed)
@@ -135,7 +136,7 @@ def run_analysis_task(
             duration = time.time() - task_start_time
             record_celery_task("aethera.run_analysis", "completed", duration)
             span.set_attribute("run_id", run_id)
-            span.set_status(trace.Status(trace.StatusCode.OK))
+            span.set_status(Status(StatusCode.OK))
             return {
                 "status": "completed",
                 "run_id": run_id,
@@ -147,6 +148,6 @@ def run_analysis_task(
             logger.exception("Error in analysis task: %s", exc)
             self.update_state(state="FAILURE", meta={"error": str(exc)})
             record_celery_task("aethera.run_analysis", "failed", duration)
-            span.set_status(trace.Status(trace.StatusCode.ERROR, str(exc)))
+            span.set_status(Status(StatusCode.ERROR, str(exc)))
             span.record_exception(exc)
             return {"status": "failed", "error": str(exc)}

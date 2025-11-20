@@ -2,18 +2,43 @@
 
 from __future__ import annotations
 
-import logging
+import asyncio
 from typing import Any
 
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.trace import Status, StatusCode
+
+# Conditional imports for instrumentation and exporters
+try:
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+except ImportError:
+    try:
+        from opentelemetry.exporter.otlp.proto.http import OTLPSpanExporter
+    except ImportError:
+        OTLPSpanExporter = None  # type: ignore
+
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+except ImportError:
+    FastAPIInstrumentor = None  # type: ignore
+
+try:
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+except ImportError:
+    HTTPXClientInstrumentor = None  # type: ignore
+
+try:
+    from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
+except ImportError:
+    PsycopgInstrumentor = None  # type: ignore
+
+try:
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+except ImportError:
+    RedisInstrumentor = None  # type: ignore
 
 from ..config.base_settings import settings
 from ..logging_utils import get_logger
@@ -49,9 +74,21 @@ def setup_tracing(app: Any | None = None) -> None:
         # Add span processors
         if settings.otlp_endpoint:
             # Export to OTLP collector
-            otlp_exporter = OTLPSpanExporter(endpoint=settings.otlp_endpoint)
-            tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
-            logger.info("Tracing configured with OTLP exporter: %s", settings.otlp_endpoint)
+            if OTLPSpanExporter is None:
+                logger.warning("OTLP exporter not available. Using console exporter instead.")
+                console_exporter = ConsoleSpanExporter()
+                tracer_provider.add_span_processor(BatchSpanProcessor(console_exporter))
+                logger.info("Tracing configured with console exporter (OTLP not available)")
+            else:
+                try:
+                    otlp_exporter = OTLPSpanExporter(endpoint=settings.otlp_endpoint)
+                    tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+                    logger.info("Tracing configured with OTLP exporter: %s", settings.otlp_endpoint)
+                except Exception as e:
+                    logger.warning("Failed to create OTLP exporter: %s. Using console exporter.", e)
+                    console_exporter = ConsoleSpanExporter()
+                    tracer_provider.add_span_processor(BatchSpanProcessor(console_exporter))
+                    logger.info("Tracing configured with console exporter")
         else:
             # Export to console (for development)
             console_exporter = ConsoleSpanExporter()
@@ -59,32 +96,74 @@ def setup_tracing(app: Any | None = None) -> None:
             logger.info("Tracing configured with console exporter")
 
         # Instrument libraries
-        try:
-            FastAPIInstrumentor().instrument()
-            logger.debug("FastAPI instrumentation enabled")
-        except Exception as e:
-            logger.warning("Failed to instrument FastAPI: %s", e)
+        if FastAPIInstrumentor is not None:
+            try:
+                FastAPIInstrumentor().instrument()
+                logger.debug("FastAPI instrumentation enabled")
+            except Exception as e:
+                logger.warning("Failed to instrument FastAPI: %s", e)
+        else:
+            logger.debug("FastAPI instrumentation not available")
+
+        if HTTPXClientInstrumentor is not None:
+            try:
+                HTTPXClientInstrumentor().instrument()
+                logger.debug("HTTPX instrumentation enabled")
+            except Exception as e:
+                logger.warning("Failed to instrument HTTPX: %s", e)
+        else:
+            logger.debug("HTTPX instrumentation not available")
+
+        if PsycopgInstrumentor is not None:
+            try:
+                PsycopgInstrumentor().instrument()
+                logger.debug("Psycopg instrumentation enabled")
+            except Exception as e:
+                logger.warning("Failed to instrument Psycopg: %s", e)
+        else:
+            logger.debug("Psycopg instrumentation not available")
+
+        if RedisInstrumentor is not None:
+            try:
+                RedisInstrumentor().instrument()
+                logger.debug("Redis instrumentation enabled")
+            except Exception as e:
+                logger.warning("Failed to instrument Redis: %s", e)
+        else:
+            logger.debug("Redis instrumentation not available")
 
         try:
-            HTTPXClientInstrumentor().instrument()
-            logger.debug("HTTPX instrumentation enabled")
+            from opentelemetry.instrumentation.celery import CeleryInstrumentor
+
+            CeleryInstrumentor().instrument()
+            logger.debug("Celery instrumentation enabled")
+        except ImportError:
+            logger.debug("Celery instrumentation not available (optional)")
         except Exception as e:
-            logger.warning("Failed to instrument HTTPX: %s", e)
+            logger.warning("Failed to instrument Celery: %s", e)
 
         try:
-            PsycopgInstrumentor().instrument()
-            logger.debug("Psycopg instrumentation enabled")
+            from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
+            RequestsInstrumentor().instrument()
+            logger.debug("Requests instrumentation enabled")
+        except ImportError:
+            logger.debug("Requests instrumentation not available (optional)")
         except Exception as e:
-            logger.warning("Failed to instrument Psycopg: %s", e)
+            logger.warning("Failed to instrument Requests: %s", e)
 
         try:
-            RedisInstrumentor().instrument()
-            logger.debug("Redis instrumentation enabled")
+            from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+            SQLAlchemyInstrumentor().instrument()
+            logger.debug("SQLAlchemy instrumentation enabled")
+        except ImportError:
+            logger.debug("SQLAlchemy instrumentation not available (optional)")
         except Exception as e:
-            logger.warning("Failed to instrument Redis: %s", e)
+            logger.warning("Failed to instrument SQLAlchemy: %s", e)
 
         # Instrument FastAPI app if provided
-        if app is not None:
+        if app is not None and FastAPIInstrumentor is not None:
             try:
                 FastAPIInstrumentor.instrument_app(app)
                 logger.info("FastAPI app instrumented for tracing")
@@ -124,7 +203,6 @@ def trace_function(name: str | None = None):
     """
     def decorator(func):
         from functools import wraps
-        import asyncio
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
@@ -135,10 +213,10 @@ def trace_function(name: str | None = None):
                 span.set_attribute("function.module", func.__module__)
                 try:
                     result = func(*args, **kwargs)
-                    span.set_status(trace.Status(trace.StatusCode.OK))
+                    span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
                     span.record_exception(e)
                     raise
 
@@ -151,10 +229,10 @@ def trace_function(name: str | None = None):
                 span.set_attribute("function.module", func.__module__)
                 try:
                     result = await func(*args, **kwargs)
-                    span.set_status(trace.Status(trace.StatusCode.OK))
+                    span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as e:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
                     span.record_exception(e)
                     raise
 
