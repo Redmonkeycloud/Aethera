@@ -8,6 +8,9 @@ from pathlib import Path
 import geopandas as gpd
 from geopandas import GeoDataFrame
 
+from ..config.base_settings import settings
+from ..utils.dask_geopandas import get_dask_wrapper
+from ..utils.tiling import clip_vector_tiled, should_tile
 from .logging_utils import get_logger
 
 
@@ -28,6 +31,8 @@ class GISHandler:
         """
         Clip a vector dataset to the AOI.
 
+        Uses tiling for large AOIs and Dask-Geopandas for parallel processing if enabled.
+
         Args:
             dataset_path: Path to the dataset file
             aoi: Area of interest GeoDataFrame
@@ -38,12 +43,44 @@ class GISHandler:
             Clipped GeoDataFrame
         """
         logger.info("Clipping dataset %s", dataset_path)
+
+        # Check if we should use tiling
+        use_tiling = should_tile(aoi)
+
+        # Try Dask-Geopandas first if enabled
+        dask_wrapper = get_dask_wrapper()
+        if dask_wrapper and not use_tiling:
+            try:
+                with dask_wrapper:
+                    clipped = dask_wrapper.clip_parallel(dataset_path, aoi)
+                    if not clipped.empty:
+                        output_path = self.output_dir / output_name
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        clipped.to_file(output_path)
+                        logger.info("Saved clipped dataset (Dask) to %s", output_path)
+                        return clipped
+            except Exception as e:
+                logger.warning("Dask clip failed, falling back to standard clip: %s", e)
+
+        # Use tiling for large AOIs
+        if use_tiling:
+            try:
+                clipped = clip_vector_tiled(dataset_path, aoi)
+                if not clipped.empty:
+                    output_path = self.output_dir / output_name
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    clipped.to_file(output_path)
+                    logger.info("Saved clipped dataset (tiled) to %s", output_path)
+                    return clipped
+            except Exception as e:
+                logger.warning("Tiled clip failed, falling back to standard clip: %s", e)
+
+        # Standard clipping approach
         bbox = tuple(aoi.total_bounds.tolist())
 
         # Try to use cache if available and enabled
         if use_cache:
             from ..datasets.catalog import DatasetCatalog
-            from ..config.base_settings import settings
 
             catalog = DatasetCatalog(settings.data_sources_dir)
             if catalog.cache:

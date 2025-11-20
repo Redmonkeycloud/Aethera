@@ -40,6 +40,13 @@ class AppSettings(BaseSettings):
     enable_metrics: bool = Field(True, alias="ENABLE_METRICS")
     metrics_port: int = Field(9090, alias="METRICS_PORT")
 
+    # Performance optimization configuration
+    enable_dask: bool = Field(False, alias="ENABLE_DASK")  # Enable Dask-Geopandas for parallel processing
+    enable_tiling: bool = Field(False, alias="ENABLE_TILING")  # Enable tiling for large AOIs
+    tile_size_km: float = Field(50.0, alias="TILE_SIZE_KM")  # Tile size in kilometers
+    aoi_size_threshold_km2: float = Field(1000.0, alias="AOI_SIZE_THRESHOLD_KM2")  # Threshold for auto-tiling (km²)
+    dask_workers: int | None = Field(None, alias="DASK_WORKERS")  # Number of Dask workers (None = auto)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -58,6 +58,11 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.42b0",
     "prometheus-client>=0.19.0"
 ]
+performance = [
+    "dask>=2024.1",
+    "dask-geopandas>=0.3.0",
+    "distributed>=2024.1"
+]
 
 [project.optional-dependencies]
 dev = [
