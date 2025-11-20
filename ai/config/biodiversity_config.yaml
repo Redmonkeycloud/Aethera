@@ -3,19 +3,25 @@ model:
   version: 0.1.0
   overlay_features:
     - protected_area_overlap
-    - habitat_type
     - fragmentation_index
   ml_features:
-    - land_cover_onehot
-    - distance_to_water
-    - distance_to_roads
-    - slope
-    - elevation
+    # Currently implemented features:
+    - aoi_area_ha
+    - protected_overlap_ha
+    - protected_overlap_pct
+    - protected_site_count
+    - fragmentation_index
+    - forest_ratio
+    # Future features (not yet implemented):
+    # - distance_to_water (requires water bodies dataset integration)
+    # - distance_to_roads (requires roads dataset integration)
+    # - slope (requires DEM/elevation data)
+    # - elevation (requires DEM/elevation data)
+    # - habitat_type (requires habitat classification)
   candidates:
-    - xgboost
-    - lightgbm
+    - logistic_regression
     - random_forest
-    - neural_net
+    - gradient_boosting
 training:
   validation_metric: f1_macro
   cross_validation_folds: 5

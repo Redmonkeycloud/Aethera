@@ -40,6 +40,12 @@ class AppSettings(BaseSettings):
     enable_metrics: bool = Field(True, alias="ENABLE_METRICS")
     metrics_port: int = Field(9090, alias="METRICS_PORT")
 
+    # Dataset caching configuration
+    dataset_cache_enabled: bool = Field(True, alias="DATASET_CACHE_ENABLED")  # Enable dataset caching
+    dataset_cache_dir: Path = Field(Path("../data/cache"), alias="DATASET_CACHE_DIR")  # Cache directory
+    dataset_cache_max_mb: int = Field(500, alias="DATASET_CACHE_MAX_MB")  # Maximum cache size in MB
+    dataset_cache_ttl_hours: int = Field(24, alias="DATASET_CACHE_TTL_HOURS")  # Cache TTL in hours
+
     # Performance optimization configuration
     enable_dask: bool = Field(False, alias="ENABLE_DASK")  # Enable Dask-Geopandas for parallel processing
     enable_tiling: bool = Field(False, alias="ENABLE_TILING")  # Enable tiling for large AOIs

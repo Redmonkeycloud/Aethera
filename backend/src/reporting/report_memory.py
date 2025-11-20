@@ -26,22 +26,32 @@ class ReportEntry:
 
 
 class ReportMemoryStore:
-    """In-memory placeholder that mirrors the future database-backed store."""
+    """
+    In-memory placeholder for report memory store.
+    
+    .. deprecated:: 0.1.0
+        This class is deprecated. Use :class:`DatabaseReportMemoryStore` instead
+        for production use. This class is kept for backward compatibility and testing.
+    """
 
     def __init__(self) -> None:
         self._entries: list[ReportEntry] = []
 
     def add_entry(self, entry: ReportEntry) -> None:
-        """Register a new report version (placeholder until DB is ready)."""
+        """Register a new report version (placeholder - use DatabaseReportMemoryStore for production)."""
         self._entries.append(entry)
 
     def list_entries(self) -> list[ReportEntry]:
-        """Return known reports (currently in-memory)."""
+        """Return known reports (in-memory only - use DatabaseReportMemoryStore for persistence)."""
         return list(self._entries)
 
     def find_similar(self, summary: str) -> list[ReportEntry]:
-        """Stub for future embedding/vector search."""
-        # TODO: integrate pgvector/FAISS to search by semantic similarity.
+        """
+        Stub for similarity search.
+        
+        .. deprecated:: 0.1.0
+            Use :class:`DatabaseReportMemoryStore.find_similar()` for actual semantic search.
+        """
         return []
 
 

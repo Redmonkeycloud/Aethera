@@ -193,9 +193,39 @@ def main() -> None:
 
     # Distance-to-receptor calculations
     logger.info("Calculating distances to sensitive receptors...")
+    
+    # Load settlements from GADM (administrative level 1 or 2 can represent cities/towns)
+    settlements_clip = None
+    try:
+        gadm_path = catalog.gadm(level=1)  # Level 1 = states/provinces (often contain major cities)
+        if gadm_path:
+            settlements_clip = gis.clip_vector(gadm_path, buffered_aoi, "receptors/settlements_clipped.gpkg")
+            if settlements_clip.empty:
+                # Try level 0 (country) as fallback
+                gadm_path = catalog.gadm(level=0)
+                if gadm_path:
+                    settlements_clip = gis.clip_vector(gadm_path, buffered_aoi, "receptors/settlements_clipped.gpkg")
+            logger.info("Loaded %d settlement features for receptor analysis", len(settlements_clip) if not settlements_clip.empty else 0)
+    except Exception as exc:
+        logger.warning("Could not load settlements from GADM: %s", exc)
+        settlements_clip = None
+    
+    # Load water bodies from rivers dataset
+    water_bodies_clip = None
+    try:
+        rivers_path = catalog.rivers()
+        if rivers_path:
+            water_bodies_clip = gis.clip_vector(rivers_path, buffered_aoi, "receptors/rivers_clipped.gpkg")
+            logger.info("Loaded %d water body features for receptor analysis", len(water_bodies_clip) if not water_bodies_clip.empty else 0)
+    except Exception as exc:
+        logger.warning("Could not load water bodies from rivers dataset: %s", exc)
+        water_bodies_clip = None
+    
     receptor_analysis = calculate_distance_to_receptors(
         aoi=aoi,
         protected_areas=natura_clip if not natura_clip.empty else None,
+        settlements=settlements_clip if settlements_clip is not None and not settlements_clip.empty else None,
+        water_bodies=water_bodies_clip if water_bodies_clip is not None and not water_bodies_clip.empty else None,
         max_distance_km=50.0,
     )
     receptor_summary = {

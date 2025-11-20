@@ -73,9 +73,62 @@ class DatasetCatalog:
         )
 
     def biodiversity_training(self) -> Path | None:
-        return self._search(
-            "biodiversity", ["training.parquet", "training.csv", "*.parquet", "*.csv"]
+        """
+        Find biodiversity training dataset.
+        
+        Searches in order:
+        1. Main training files (training.parquet, training.csv) in biodiversity/ root
+        2. Any parquet/csv files in biodiversity/ root
+        3. External datasets in biodiversity/external/ (owid, gbif, etc.)
+        """
+        # First try main training files
+        main_training = self._search(
+            "biodiversity", ["training.parquet", "training.csv"]
         )
+        if main_training:
+            return main_training
+        
+        # Then try any parquet/csv in root
+        any_training = self._search(
+            "biodiversity", ["*.parquet", "*.csv"]
+        )
+        if any_training:
+            return any_training
+        
+        # Finally try external datasets (prefer parquet, then csv)
+        external_training = self._search(
+            "biodiversity/external", ["*.parquet", "*.csv"]
+        )
+        return external_training
+
+    def rivers(self) -> Path | None:
+        """Find HydroRIVERS dataset (prefer EU subset if available)."""
+        # Try EU subset first (smaller, faster)
+        eu_path = self._search("rivers/HydroRIVERS_v10_eu_shp", ["*.shp"])
+        if eu_path:
+            return eu_path
+        # Fall back to global dataset
+        return self._search("rivers/HydroRIVERS_v10_shp", ["*.shp"])
+
+    def wdpa(self) -> Path | None:
+        """Find WDPA (World Database on Protected Areas) dataset."""
+        return self._search("protected_areas/wdpa", ["*.gpkg", "*.shp"])
+
+    def roads(self) -> Path | None:
+        """
+        Find roads dataset.
+        
+        Note: OSM PBF files require conversion to GeoJSON/Shapefile first.
+        This method looks for already-converted files (GeoJSON, Shapefile, GPKG).
+        For OSM PBF files, use external tools (osmium-tool, pyosmium) to convert first.
+        """
+        # Look for converted formats first (preferred)
+        converted = self._search("roads", ["*.gpkg", "*.geojson", "*.shp"])
+        if converted:
+            return converted
+        # Note: OSM PBF files (.osm.pbf) are not directly readable by GeoPandas
+        # They need to be converted using tools like osmium-tool or pyosmium
+        return None
 
     def load_dataset(
         self,
