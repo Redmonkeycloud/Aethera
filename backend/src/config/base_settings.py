@@ -27,6 +27,11 @@ class AppSettings(BaseSettings):
     s3_secret_access_key: str | None = Field(None, alias="S3_SECRET_ACCESS_KEY")
     s3_region: str | None = Field(None, alias="S3_REGION")
 
+    # Embedding configuration
+    embedding_provider: str = Field("sentence-transformers", alias="EMBEDDING_PROVIDER")  # "openai" or "sentence-transformers"
+    openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
+    embedding_model: str = Field("all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")  # Default: sentence-transformers model
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

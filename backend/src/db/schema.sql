@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS reports_history (
     status TEXT NOT NULL,
     summary TEXT,
     storage_path TEXT NOT NULL,
+    metadata JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -35,10 +36,14 @@ CREATE TABLE IF NOT EXISTS reports_history (
 CREATE TABLE IF NOT EXISTS report_embeddings (
     report_id UUID REFERENCES reports_history(id),
     section TEXT NOT NULL,
-    embedding VECTOR(1536),
+    embedding VECTOR,  -- Variable dimension to support different embedding models
     metadata JSONB,
     PRIMARY KEY (report_id, section)
 );
+
+-- Add index for vector similarity search
+CREATE INDEX IF NOT EXISTS idx_report_embeddings_vector ON report_embeddings 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 CREATE TABLE IF NOT EXISTS model_runs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes import biodiversity, layers, projects, runs, tasks
+from .routes import biodiversity, layers, projects, reports, runs, tasks
 
 
 app = FastAPI(title="AETHERA API", version="0.1.0")
@@ -31,4 +31,5 @@ app.include_router(runs.router, prefix="/runs", tags=["runs"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(biodiversity.router)
 app.include_router(layers.router)
+app.include_router(reports.router)
 

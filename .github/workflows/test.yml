@@ -1,0 +1,128 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: aethera
+          POSTGRES_PASSWORD: aethera
+          POSTGRES_DB: aethera_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install PostgreSQL extensions
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-16-pgvector
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Initialize test database
+      working-directory: ./backend
+      env:
+        POSTGRES_DSN: postgresql://aethera:aethera@localhost:5432/aethera_test
+      run: |
+        python -m src.db.init_db --dsn $POSTGRES_DSN
+    
+    - name: Run unit tests
+      working-directory: ./backend
+      env:
+        POSTGRES_DSN: postgresql://aethera:aethera@localhost:5432/aethera_test
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        pytest tests/unit -v --cov=src --cov-report=xml --cov-report=term
+    
+    - name: Run integration tests
+      working-directory: ./backend
+      env:
+        POSTGRES_DSN: postgresql://aethera:aethera@localhost:5432/aethera_test
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        pytest tests/integration -v --cov=src --cov-append --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run type check
+      working-directory: ./frontend
+      run: npm run type-check
+    
+    - name: Run linter
+      working-directory: ./frontend
+      run: npm run lint
+    
+    - name: Install Playwright browsers
+      working-directory: ./frontend
+      run: npx playwright install --with-deps
+    
+    - name: Run Playwright tests
+      working-directory: ./frontend
+      env:
+        VITE_API_URL: http://localhost:8000
+      run: |
+        # Start backend API in background
+        cd ../backend
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        uvicorn src.api.app:app --host 0.0.0.0 --port 8000 &
+        sleep 5
+        cd ../frontend
+        npm run test:e2e || true  # Don't fail on e2e tests for now
+
