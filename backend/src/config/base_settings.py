@@ -53,6 +53,17 @@ class AppSettings(BaseSettings):
     drift_threshold: float = Field(0.2, alias="DRIFT_THRESHOLD")  # Default drift alert threshold
     drift_detection_method: str = Field("ks_test", alias="DRIFT_DETECTION_METHOD")  # Default drift detection method
 
+    # Security configuration
+    jwt_secret_key: str = Field("change-me-in-production", alias="JWT_SECRET_KEY")  # JWT signing secret (CHANGE IN PRODUCTION!)
+    jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")  # JWT algorithm
+    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")  # Access token expiration
+    refresh_token_expire_days: int = Field(7, alias="REFRESH_TOKEN_EXPIRE_DAYS")  # Refresh token expiration
+    enable_authentication: bool = Field(True, alias="ENABLE_AUTHENTICATION")  # Enable authentication middleware
+    enable_audit_logging: bool = Field(True, alias="ENABLE_AUDIT_LOGGING")  # Enable audit logging
+    oauth_google_client_id: str | None = Field(None, alias="OAUTH_GOOGLE_CLIENT_ID")  # Google OAuth client ID
+    oauth_microsoft_client_id: str | None = Field(None, alias="OAUTH_MICROSOFT_CLIENT_ID")  # Microsoft OAuth client ID
+    oauth_okta_domain: str | None = Field(None, alias="OAUTH_OKTA_DOMAIN")  # Okta domain
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

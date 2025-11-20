@@ -6,7 +6,8 @@ from starlette.types import ASGIApp
 from ..observability.metrics import record_http_request, setup_metrics
 from ..observability.tracing import setup_tracing
 from ..config.base_settings import settings
-from .routes import biodiversity, governance, layers, observability, projects, reports, runs, tasks
+from .routes import audit, auth, biodiversity, governance, layers, observability, projects, reports, runs, tasks
+from ..security.middleware import AuditMiddleware, AuthenticationMiddleware
 
 
 app = FastAPI(title="AETHERA API", version="0.1.0")
@@ -48,6 +49,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(MetricsMiddleware)
+app.add_middleware(AuthenticationMiddleware)
+app.add_middleware(AuditMiddleware)
 
 @app.get("/")
 async def root():
@@ -60,6 +63,8 @@ async def root():
     }
 
 
+app.include_router(auth.router)
+app.include_router(audit.router)
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(runs.router, prefix="/runs", tags=["runs"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])

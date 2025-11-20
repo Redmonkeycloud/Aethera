@@ -174,3 +174,164 @@ CREATE TABLE IF NOT EXISTS model_ab_test_results (
 CREATE INDEX IF NOT EXISTS idx_ab_tests_status ON model_ab_tests(status, start_date);
 CREATE INDEX IF NOT EXISTS idx_ab_test_results_test ON model_ab_test_results(ab_test_id);
 
+-- Security Tables
+
+-- Users: User accounts
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,  -- bcrypt hash
+    full_name TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_superuser BOOLEAN DEFAULT FALSE,
+    oauth_provider TEXT,  -- 'google', 'microsoft', 'okta', etc.
+    oauth_sub TEXT,  -- OAuth subject identifier
+    last_login TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Roles: User roles (e.g., admin, analyst, viewer)
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Permissions: Individual permissions (e.g., 'projects:create', 'reports:read')
+CREATE TABLE IF NOT EXISTS permissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT UNIQUE NOT NULL,
+    resource TEXT NOT NULL,  -- e.g., 'projects', 'reports', 'models'
+    action TEXT NOT NULL,  -- e.g., 'create', 'read', 'update', 'delete'
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(resource, action)
+);
+
+-- User Roles: Many-to-many relationship
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+    assigned_by UUID REFERENCES users(id),
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- Role Permissions: Many-to-many relationship
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+    granted_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- Refresh Tokens: For JWT token refresh
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ,
+    device_info TEXT,  -- User agent, IP, etc.
+    ip_address TEXT
+);
+
+-- Audit Logs: Track all security-relevant actions
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    username TEXT,  -- Denormalized for historical records
+    action TEXT NOT NULL,  -- e.g., 'LOGIN', 'CREATE_PROJECT', 'DELETE_RUN'
+    resource_type TEXT,  -- e.g., 'project', 'run', 'user'
+    resource_id TEXT,  -- ID of the affected resource
+    ip_address TEXT,
+    user_agent TEXT,
+    request_method TEXT,  -- HTTP method
+    request_path TEXT,  -- API endpoint
+    request_body JSONB,  -- Request payload (sanitized)
+    response_status INTEGER,  -- HTTP status code
+    error_message TEXT,  -- If action failed
+    metadata JSONB,  -- Additional context
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for security tables
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_sub);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission ON role_permissions(permission_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+
+-- Default roles and permissions (insert if not exists)
+INSERT INTO roles (name, description) VALUES
+    ('admin', 'Full system access'),
+    ('analyst', 'Can create projects, run analyses, view results'),
+    ('viewer', 'Read-only access to projects and reports')
+ON CONFLICT (name) DO NOTHING;
+
+-- Default permissions
+INSERT INTO permissions (name, resource, action, description) VALUES
+    ('projects:create', 'projects', 'create', 'Create new projects'),
+    ('projects:read', 'projects', 'read', 'View projects'),
+    ('projects:update', 'projects', 'update', 'Update projects'),
+    ('projects:delete', 'projects', 'delete', 'Delete projects'),
+    ('runs:create', 'runs', 'create', 'Create analysis runs'),
+    ('runs:read', 'runs', 'read', 'View analysis runs'),
+    ('runs:update', 'runs', 'update', 'Update analysis runs'),
+    ('runs:delete', 'runs', 'delete', 'Delete analysis runs'),
+    ('reports:read', 'reports', 'read', 'View reports'),
+    ('reports:export', 'reports', 'export', 'Export reports'),
+    ('models:read', 'models', 'read', 'View model information'),
+    ('models:manage', 'models', 'manage', 'Manage model registry'),
+    ('users:read', 'users', 'read', 'View user information'),
+    ('users:manage', 'users', 'manage', 'Manage users and roles'),
+    ('audit:read', 'audit', 'read', 'View audit logs')
+ON CONFLICT (resource, action) DO NOTHING;
+
+-- Assign permissions to roles
+-- Admin: all permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r, permissions p
+WHERE r.name = 'admin'
+ON CONFLICT DO NOTHING;
+
+-- Analyst: projects, runs, reports (read/export), models (read)
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r, permissions p
+WHERE r.name = 'analyst'
+  AND p.name IN (
+    'projects:create', 'projects:read', 'projects:update',
+    'runs:create', 'runs:read', 'runs:update',
+    'reports:read', 'reports:export',
+    'models:read'
+  )
+ON CONFLICT DO NOTHING;
+
+-- Viewer: read-only access
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r, permissions p
+WHERE r.name = 'viewer'
+  AND p.name IN (
+    'projects:read',
+    'runs:read',
+    'reports:read',
+    'models:read'
+  )
+ON CONFLICT DO NOTHING;
+

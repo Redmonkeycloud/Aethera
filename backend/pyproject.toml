@@ -57,7 +57,10 @@ dependencies = [
     "opentelemetry-instrumentation-celery>=0.42b0",
     "opentelemetry-instrumentation-requests>=0.42b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.42b0",
-    "prometheus-client>=0.19.0"
+    "prometheus-client>=0.19.0",
+    "pyjwt>=2.8.0",
+    "bcrypt>=4.1.0",
+    "python-jose[cryptography]>=3.3.0"
 ]
 performance = [
     "dask>=2024.1",
