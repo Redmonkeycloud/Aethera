@@ -18,6 +18,20 @@ class AppSettings(BaseSettings):
     postgres_dsn: str = Field("postgresql://aethera:aethera@localhost:55432/aethera", alias="POSTGRES_DSN")
     redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
 
+    # Storage configuration
+    storage_backend: str = Field("local", alias="STORAGE_BACKEND")
+    storage_base_path: Path | None = Field(None, alias="STORAGE_BASE_PATH")
+    s3_endpoint_url: str | None = Field(None, alias="S3_ENDPOINT_URL")
+    s3_bucket: str | None = Field(None, alias="S3_BUCKET")
+    s3_access_key_id: str | None = Field(None, alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str | None = Field(None, alias="S3_SECRET_ACCESS_KEY")
+    s3_region: str | None = Field(None, alias="S3_REGION")
+
+    # Embedding configuration
+    embedding_provider: str = Field("sentence-transformers", alias="EMBEDDING_PROVIDER")  # "openai" or "sentence-transformers"
+    openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
+    embedding_model: str = Field("all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")  # Default: sentence-transformers model
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

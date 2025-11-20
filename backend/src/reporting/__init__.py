@@ -1,6 +1,17 @@
 """Reporting utilities (templates, learning memory, generators)."""
 
-from .report_memory import ReportMemoryStore
+from .embeddings import EmbeddingService
+from .engine import ReportEngine
+from .exports import ReportExporter
+from .report_memory import ReportEntry, ReportMemoryStore
+from .report_memory_db import DatabaseReportMemoryStore
 
-__all__ = ["ReportMemoryStore"]
+__all__ = [
+    "EmbeddingService",
+    "ReportEngine",
+    "ReportExporter",
+    "ReportEntry",
+    "ReportMemoryStore",
+    "DatabaseReportMemoryStore",
+]
 

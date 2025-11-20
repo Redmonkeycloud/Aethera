@@ -1,0 +1,7 @@
+{
+  "task.autoDetect": "on",
+  "task.quickOpen.history": 10,
+  "task.quickOpen.detail": true,
+  "task.quickOpen.skip": false
+}
+

@@ -1,0 +1,152 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Docker Redis",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "start",
+        "aethera-redis"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "runOptions": {
+        "runOn": "default"
+      }
+    },
+    {
+      "label": "Start Redis (Create if not exists)",
+      "type": "shell",
+      "command": "$container = docker ps -a --filter 'name=aethera-redis' --format '{{.Names}}'; if (-not $container) { docker run -d -p 6379:6379 --name aethera-redis redis:7-alpine } else { docker start aethera-redis }",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "windows": {
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": ["-Command"]
+          }
+        }
+      }
+    },
+    {
+      "label": "Start Celery Worker",
+      "type": "shell",
+      "command": "cd '${workspaceFolder}'; if (Test-Path 'backend\\venv\\Scripts\\Activate.ps1') { .\\backend\\venv\\Scripts\\Activate.ps1 }; $env:PYTHONPATH='${workspaceFolder}'; celery -A backend.src.workers.celery_app worker --pool=solo --loglevel=info",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}"
+        },
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoExit", "-Command"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "group": "services"
+      }
+    },
+    {
+      "label": "Start FastAPI Server",
+      "type": "shell",
+      "command": "cd '${workspaceFolder}'; if (Test-Path 'backend\\venv\\Scripts\\Activate.ps1') { .\\backend\\venv\\Scripts\\Activate.ps1 }; $env:PYTHONPATH='${workspaceFolder}'; uvicorn backend.src.api.app:app --host localhost --port 8000 --reload",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}"
+        },
+        "shell": {
+          "executable": "powershell.exe",
+          "args": ["-NoExit", "-Command"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "group": "services"
+      }
+    },
+    {
+      "label": "Start Frontend Dev Server",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "dev"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^([^\\s].*)\\s\\((\\d+):(\\d+)\\)\\s(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": ".*Local:.*|.*ready in.*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "group": "services"
+      }
+    },
+    {
+      "label": "Start All Services",
+      "dependsOn": [
+        "Start Redis (Create if not exists)",
+        "Start Celery Worker",
+        "Start FastAPI Server",
+        "Start Frontend Dev Server"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Stop All Services",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\stop_services.ps1",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "windows": {
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": ["-ExecutionPolicy", "Bypass", "-File"]
+          }
+        }
+      }
+    }
+  ]
+}
+

@@ -113,14 +113,59 @@ Only placeholder files are committed so far; each component will be expanded ite
    python scripts/build_biodiversity_training.py --samples 150
    ```
    The first command fetches OWID and GBIF datasets into `data2/biodiversity/external/`. The second command generates `data2/biodiversity/training.csv` derived from Natura 2000 + CORINE intersections.
-5. **API preview**
+5. **Start Services (API, Celery, Redis)**
+   
+   **Option 1: Using Make (recommended)**
+   ```bash
+   # Start all services
+   make start
+   
+   # Or start in background
+   make start-background
+   
+   # Check service status
+   make check
+   
+   # Stop all services
+   make stop
    ```
+   
+   **Option 2: Using scripts**
+   ```bash
+   # Windows (PowerShell)
+   .\scripts\start_services.ps1
+   
+   # Linux/Mac
+   bash scripts/start_services.sh
+   ```
+   
+   **Option 3: Manual start**
+   ```bash
+   # Terminal 1: Start Redis
+   redis-server
+   
+   # Terminal 2: Start Celery worker
+   celery -A backend.src.workers.celery_app worker --loglevel=info
+   
+   # Terminal 3: Start FastAPI server
    uvicorn backend.src.api.app:app --reload
    ```
-   - `POST /projects` – create a project record (stored in `data/projects.json`).
-   - `GET /projects` – list projects.
-   - `GET /runs` – list completed runs via `manifest.json` files.
-   - `GET /runs/{run_id}/biodiversity/{layer}` – download GeoJSON layers (`sensitivity`, `natura`, `overlap`) for map rendering.
+   
+   Once services are running:
+   - API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
+   - Redis: localhost:6379
+   
+   **API Endpoints:**
+   - `POST /projects` – create a project record
+   - `GET /projects` – list projects
+   - `POST /projects/{id}/runs` – trigger async analysis run
+   - `GET /runs` – list completed runs
+   - `GET /runs/{run_id}` – get run details
+   - `GET /runs/{run_id}/results` – comprehensive results
+   - `GET /runs/{run_id}/legal` – legal compliance results
+   - `GET /runs/{run_id}/export` – download run package (ZIP)
+   - `GET /tasks/{task_id}` – task status polling
 6. **Frontend (later)**
    ```
    cd frontend
