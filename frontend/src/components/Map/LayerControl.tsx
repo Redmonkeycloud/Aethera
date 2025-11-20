@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import maplibregl from 'maplibre-gl'
+import type { Map } from 'maplibre-gl'
 
 interface Layer {
   id: string
@@ -9,7 +9,7 @@ interface Layer {
 }
 
 interface LayerControlProps {
-  map: maplibregl.Map
+  map: Map
   layers: Layer[]
   onLayerToggle: (layerId: string, visible: boolean) => void
 }

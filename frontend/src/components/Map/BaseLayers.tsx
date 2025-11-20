@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import maplibregl from 'maplibre-gl'
 import axios from 'axios'
+import type { Map } from 'maplibre-gl'
 
 interface BaseLayersProps {
-  map: maplibregl.Map
+  map: Map
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'

@@ -8,18 +8,8 @@ import IndicatorPanel from '../components/IndicatorPanel'
 import ResultDownload from '../components/ResultDownload'
 import { useAppStore } from '../store/useAppStore'
 
-// GeoJSON type definition
-interface GeoJSONFeatureCollection {
-  type: 'FeatureCollection'
-  features: Array<{
-    type: 'Feature'
-    geometry: {
-      type: string
-      coordinates: unknown
-    }
-    properties: Record<string, unknown>
-  }>
-}
+// GeoJSON type definition - use standard GeoJSON type
+type GeoJSONFeatureCollection = GeoJSON.FeatureCollection
 
 export default function RunPage(): React.JSX.Element {
   const { runId } = useParams<{ runId: string }>()
@@ -38,15 +28,21 @@ export default function RunPage(): React.JSX.Element {
     enabled: !!runId,
   })
 
-  const { data: results } = useQuery({
+  const { data: results } = useQuery<Record<string, unknown>>({
     queryKey: ['run-results', runId],
-    queryFn: () => runsApi.getResults(runId!),
+    queryFn: () => runsApi.getResults(runId!) as Promise<Record<string, unknown>>,
     enabled: !!runId,
   })
 
-  const { data: legal } = useQuery({
+  const { data: legal } = useQuery<{
+    overall_compliant?: boolean
+    critical_violations?: Array<{ rule_name: string }>
+  }>({
     queryKey: ['run-legal', runId],
-    queryFn: () => runsApi.getLegal(runId!),
+    queryFn: () => runsApi.getLegal(runId!) as Promise<{
+      overall_compliant?: boolean
+      critical_violations?: Array<{ rule_name: string }>
+    }>,
     enabled: !!runId,
     retry: false,
   })
@@ -69,7 +65,7 @@ export default function RunPage(): React.JSX.Element {
       for (const [layerName] of Object.entries(biodiversityLayers)) {
         try {
           const layerData = await runsApi.getBiodiversityLayer(run.run_id, layerName)
-          loadedLayers[layerName] = layerData
+          loadedLayers[layerName] = layerData as GeoJSONFeatureCollection
 
           const sourceId = `biodiversity-${layerName}`
           const layerId = `biodiversity-${layerName}-layer`
@@ -189,7 +185,7 @@ export default function RunPage(): React.JSX.Element {
                 <div className="text-sm">
                   <div className="font-medium text-red-700">Critical Violations:</div>
                   <ul className="list-disc list-inside text-red-600">
-                    {legal.critical_violations.map((v: { rule_name: string }, i: number) => (
+                    {legal.critical_violations.map((v, i) => (
                       <li key={i}>{v.rule_name}</li>
                     ))}
                   </ul>

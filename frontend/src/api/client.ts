@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosResponse, AxiosError } from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -12,18 +12,14 @@ export const apiClient = axios.create({
 
 // Add response interceptor for better error handling
 apiClient.interceptors.response.use(
-  (response: unknown) => response,
-  (error: {
-    code?: string
-    message?: string
-    response?: { data?: { detail?: string; message?: string } }
-    request?: unknown
-  }) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timeout - the server took too long to respond'
     } else if (error.response) {
       // Server responded with error status
-      error.message = error.response.data?.detail || error.response.data?.message || error.message
+      const responseData = error.response.data as { detail?: string; message?: string } | undefined
+      error.message = responseData?.detail || responseData?.message || error.message
     } else if (error.request) {
       // Request made but no response
       error.message = 'No response from server - is the API running?'

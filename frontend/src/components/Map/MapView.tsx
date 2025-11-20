@@ -24,7 +24,7 @@ export default function MapView({
     if (!mapContainer.current || map.current) return
 
     let mounted = true
-    let timeoutId: NodeJS.Timeout | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const initializeMap = () => {
       if (!mapContainer.current || map.current || !mounted) return

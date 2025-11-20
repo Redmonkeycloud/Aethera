@@ -54,7 +54,7 @@ export default function CoordinateInput({ onSuccess }: CoordinateInputProps) {
     }
 
     try {
-      let polygon: turf.Feature<turf.Polygon>
+      let polygon: turf.Feature | null = null
 
       if (inputMode === 'bbox' && coords.length === 4) {
         // Create bounding box from 4 coordinates
@@ -79,9 +79,14 @@ export default function CoordinateInput({ onSuccess }: CoordinateInputProps) {
       }
 
       // Convert to GeoJSON Feature
+      if (!polygon) {
+        setError('Failed to create polygon')
+        return
+      }
+      
       const feature: GeoJSON.Feature<GeoJSON.Polygon> = {
         type: 'Feature',
-        geometry: polygon.geometry,
+        geometry: polygon.geometry as GeoJSON.Polygon,
         properties: {},
       }
 
