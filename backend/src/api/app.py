@@ -6,7 +6,7 @@ from starlette.types import ASGIApp
 from ..observability.metrics import record_http_request, setup_metrics
 from ..observability.tracing import setup_tracing
 from ..config.base_settings import settings
-from .routes import biodiversity, layers, observability, projects, reports, runs, tasks
+from .routes import biodiversity, governance, layers, observability, projects, reports, runs, tasks
 
 
 app = FastAPI(title="AETHERA API", version="0.1.0")
@@ -67,6 +67,7 @@ app.include_router(biodiversity.router)
 app.include_router(layers.router)
 app.include_router(reports.router)
 app.include_router(observability.router)
+app.include_router(governance.router)
 
 
 @app.get("/metrics")

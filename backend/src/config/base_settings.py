@@ -47,6 +47,12 @@ class AppSettings(BaseSettings):
     aoi_size_threshold_km2: float = Field(1000.0, alias="AOI_SIZE_THRESHOLD_KM2")  # Threshold for auto-tiling (km²)
     dask_workers: int | None = Field(None, alias="DASK_WORKERS")  # Number of Dask workers (None = auto)
 
+    # Model Governance configuration
+    enable_model_registry: bool = Field(True, alias="ENABLE_MODEL_REGISTRY")  # Enable model registry
+    enable_drift_detection: bool = Field(True, alias="ENABLE_DRIFT_DETECTION")  # Enable drift detection
+    drift_threshold: float = Field(0.2, alias="DRIFT_THRESHOLD")  # Default drift alert threshold
+    drift_detection_method: str = Field("ks_test", alias="DRIFT_DETECTION_METHOD")  # Default drift detection method
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
