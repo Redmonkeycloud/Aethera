@@ -1,0 +1,51 @@
+# Large geospatial datasets (too large for git)
+data2/
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.osm.pbf
+
+# Generated analysis results (too large for git)
+data/
+tmp/
+
+# Test files
+test_aoi*.geojson
+temp_*.geojson
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+

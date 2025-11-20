@@ -1,0 +1,48 @@
+Metadata-Version: 2.4
+Name: aethera-backend
+Version: 0.1.0
+Summary: Core backend, geospatial engine, emissions, and orchestration for AETHERA.
+Author: AETHERA Team
+License: Proprietary
+Requires-Python: >=3.10
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn>=0.30
+Requires-Dist: pydantic>=2.7
+Requires-Dist: pydantic-settings>=2.3
+Requires-Dist: loguru>=0.7
+Requires-Dist: geopandas>=0.14
+Requires-Dist: shapely>=2.0
+Requires-Dist: pyogrio>=0.8
+Requires-Dist: rasterio>=1.3
+Requires-Dist: fiona>=1.9
+Requires-Dist: pandas>=2.2
+Requires-Dist: numpy>=1.26
+Requires-Dist: pyarrow>=15.0
+Requires-Dist: scikit-learn>=1.4
+Requires-Dist: xarray>=2024.1
+Requires-Dist: rioxarray>=0.15
+Requires-Dist: pyproj>=3.6
+Requires-Dist: requests>=2.32
+Requires-Dist: aiohttp>=3.9
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: sqlalchemy[asyncio]>=2.0
+Requires-Dist: asyncpg>=0.29
+Requires-Dist: psycopg[binary,pool]>=3.1
+Requires-Dist: celery>=5.4
+Requires-Dist: redis>=5.0
+Requires-Dist: structlog>=24.1
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: typer>=0.12
+Requires-Dist: rich>=13.7
+Requires-Dist: jinja2>=3.1
+Requires-Dist: boto3>=1.34.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: mypy>=1.11; extra == "dev"
+Requires-Dist: types-requests; extra == "dev"
+Requires-Dist: types-python-dateutil; extra == "dev"
+Provides-Extra: legal
+Requires-Dist: jsonlogic>=1.0.0; extra == "legal"
