@@ -32,6 +32,14 @@ class AppSettings(BaseSettings):
     openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
     embedding_model: str = Field("all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")  # Default: sentence-transformers model
 
+    # Observability configuration
+    enable_tracing: bool = Field(True, alias="ENABLE_TRACING")
+    otlp_endpoint: str | None = Field(None, alias="OTLP_ENDPOINT")  # OTLP collector endpoint
+    service_name: str = Field("aethera-backend", alias="SERVICE_NAME")
+    service_version: str = Field("0.1.0", alias="SERVICE_VERSION")
+    enable_metrics: bool = Field(True, alias="ENABLE_METRICS")
+    metrics_port: int = Field(9090, alias="METRICS_PORT")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

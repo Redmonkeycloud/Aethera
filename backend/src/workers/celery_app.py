@@ -7,6 +7,7 @@ import sys
 from celery import Celery
 
 from ..config.base_settings import settings
+from ..observability.celery_instrumentation import instrument_celery
 
 celery_app = Celery(
     "aethera",
@@ -40,4 +41,7 @@ if sys.platform == "win32":
     # Disable prefork-related settings on Windows
     celery_app.conf.worker_pool = "solo"
     celery_app.conf.worker_max_tasks_per_child = None  # Not applicable for solo pool
+
+# Initialize observability for Celery workers
+instrument_celery()
 

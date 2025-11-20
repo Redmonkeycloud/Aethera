@@ -5,14 +5,20 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
+
+from opentelemetry import trace
 
 from .celery_app import celery_app
 from ..config.base_settings import settings
 from ..logging_utils import get_logger
+from ..observability.metrics import record_celery_task
+from ..observability.tracing import get_tracer
 
 logger = get_logger(__name__)
+tracer = get_tracer(__name__)
 
 
 @celery_app.task(bind=True, name="aethera.run_analysis")
@@ -40,90 +46,107 @@ def run_analysis_task(
     Returns:
         Dictionary with run_id and status
     """
-    try:
-        # Update task state
-        self.update_state(state="PROCESSING", meta={"message": "Starting analysis pipeline"})
+    task_start_time = time.time()
 
-        # Prepare AOI file if GeoJSON provided
-        if aoi_geojson and not aoi_path:
-            import tempfile
+    with tracer.start_as_current_span("aethera.run_analysis") as span:
+        span.set_attribute("project_id", project_id)
+        span.set_attribute("project_type", project_type)
+        span.set_attribute("country", country or "unknown")
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".geojson", delete=False) as f:
-                json.dump(aoi_geojson, f)
-                aoi_path = f.name
+        try:
+            # Update task state
+            self.update_state(state="PROCESSING", meta={"message": "Starting analysis pipeline"})
 
-        if not aoi_path:
-            raise ValueError("Either aoi_path or aoi_geojson must be provided")
+            # Prepare AOI file if GeoJSON provided
+            if aoi_geojson and not aoi_path:
+                import tempfile
 
-        # Prepare command arguments
-        cmd = [
-            sys.executable,
-            "-m",
-            "backend.src.main_controller",
-            "--aoi",
-            aoi_path,
-            "--project-type",
-            project_type,
-        ]
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".geojson", delete=False) as f:
+                    json.dump(aoi_geojson, f)
+                    aoi_path = f.name
 
-        if country:
-            cmd.extend(["--country", country])
+            if not aoi_path:
+                raise ValueError("Either aoi_path or aoi_geojson must be provided")
 
-        # Write config to temp file if provided
-        config_path = None
-        if config:
-            import tempfile
+            # Prepare command arguments
+            cmd = [
+                sys.executable,
+                "-m",
+                "backend.src.main_controller",
+                "--aoi",
+                aoi_path,
+                "--project-type",
+                project_type,
+            ]
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, delete_on_close=False) as f:
-                json.dump(config, f)
-                config_path = f.name
-                cmd.extend(["--config", config_path])
+            if country:
+                cmd.extend(["--country", country])
 
-        # Update task state
-        self.update_state(state="PROCESSING", meta={"message": "Executing analysis pipeline"})
+            # Write config to temp file if provided
+            config_path = None
+            if config:
+                import tempfile
 
-        # Run the analysis
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=Path(__file__).parent.parent.parent.parent,
-        )
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, delete_on_close=False) as f:
+                    json.dump(config, f)
+                    config_path = f.name
+                    cmd.extend(["--config", config_path])
 
-        # Clean up temp files
-        if config_path:
-            Path(config_path).unlink(missing_ok=True)
-        if aoi_geojson and aoi_path:
-            Path(aoi_path).unlink(missing_ok=True)
+            # Update task state
+            self.update_state(state="PROCESSING", meta={"message": "Executing analysis pipeline"})
 
-        if result.returncode != 0:
-            error_msg = result.stderr or result.stdout
-            logger.error("Analysis pipeline failed: %s", error_msg)
-            self.update_state(state="FAILURE", meta={"error": error_msg})
-            return {"status": "failed", "error": error_msg}
+            # Run the analysis
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent.parent.parent,
+            )
 
-        # Extract run_id from output (assuming it's printed)
-        # In practice, we'd parse the manifest or output directory
-        run_id = "unknown"
-        if "run_" in result.stdout:
-            # Try to extract run_id from output
-            for line in result.stdout.split("\n"):
-                if "run_" in line:
-                    parts = line.split()
-                    for part in parts:
-                        if part.startswith("run_"):
-                            run_id = part
-                            break
+            # Clean up temp files
+            if config_path:
+                Path(config_path).unlink(missing_ok=True)
+            if aoi_geojson and aoi_path:
+                Path(aoi_path).unlink(missing_ok=True)
 
-        logger.info("Analysis pipeline completed successfully for run %s", run_id)
-        return {
-            "status": "completed",
-            "run_id": run_id,
-            "project_id": project_id,
-        }
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout
+                logger.error("Analysis pipeline failed: %s", error_msg)
+                self.update_state(state="FAILURE", meta={"error": error_msg})
+                duration = time.time() - task_start_time
+                record_celery_task("aethera.run_analysis", "failed", duration)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                return {"status": "failed", "error": error_msg}
 
-    except Exception as exc:
-        logger.exception("Error in analysis task: %s", exc)
-        self.update_state(state="FAILURE", meta={"error": str(exc)})
-        return {"status": "failed", "error": str(exc)}
+            # Extract run_id from output (assuming it's printed)
+            # In practice, we'd parse the manifest or output directory
+            run_id = "unknown"
+            if "run_" in result.stdout:
+                # Try to extract run_id from output
+                for line in result.stdout.split("\n"):
+                    if "run_" in line:
+                        parts = line.split()
+                        for part in parts:
+                            if part.startswith("run_"):
+                                run_id = part
+                                break
 
+            logger.info("Analysis pipeline completed successfully for run %s", run_id)
+            duration = time.time() - task_start_time
+            record_celery_task("aethera.run_analysis", "completed", duration)
+            span.set_attribute("run_id", run_id)
+            span.set_status(trace.Status(trace.StatusCode.OK))
+            return {
+                "status": "completed",
+                "run_id": run_id,
+                "project_id": project_id,
+            }
+
+        except Exception as exc:
+            duration = time.time() - task_start_time
+            logger.exception("Error in analysis task: %s", exc)
+            self.update_state(state="FAILURE", meta={"error": str(exc)})
+            record_celery_task("aethera.run_analysis", "failed", duration)
+            span.set_status(trace.Status(trace.StatusCode.ERROR, str(exc)))
+            span.record_exception(exc)
+            return {"status": "failed", "error": str(exc)}
