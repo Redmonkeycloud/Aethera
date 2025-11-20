@@ -25,6 +25,8 @@ from .emissions.calculator import EmissionCalculator
 from .emissions.factors import EmissionFactorStore
 from .gis_handler import GISHandler
 from .logging_utils import configure_logging, get_logger
+from .utils.dataset_checker import DatasetAvailabilityChecker
+from .utils.error_handling import safe_dataset_load
 from .utils.geometry import buffer_aoi, load_aoi
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -86,11 +88,37 @@ def main() -> None:
     catalog = DatasetCatalog(settings.data_sources_dir)
     gis = GISHandler(run_dir / settings.processed_dir_name)
 
+    # Check dataset availability before starting analysis
+    logger.info("Checking dataset availability...")
+    dataset_checker = DatasetAvailabilityChecker(catalog)
+    availability_report = dataset_checker.check_all()
+    
+    if not availability_report.all_available:
+        missing = ", ".join(availability_report.missing_required)
+        error_msg = f"Required datasets missing: {missing}. Cannot proceed with analysis."
+        logger.error(error_msg)
+        # Save availability report for debugging
+        availability_path = run_dir / "dataset_availability.json"
+        with open(availability_path, "w", encoding="utf-8") as f:
+            import json
+            json.dump(availability_report.to_dict(), f, indent=2)
+        raise RuntimeError(error_msg)
+    
+    logger.info("All required datasets available. Optional datasets: %d/%d available",
+                sum(1 for ds in availability_report.optional_datasets if ds.available),
+                len(availability_report.optional_datasets))
+
     logger.info("Loading AOI from %s", args.aoi)
     aoi = load_aoi(args.aoi, settings.default_crs)
     buffered_aoi = buffer_aoi(aoi, settings.buffer_km)
 
-    corine_path = catalog.corine()
+    corine_path = safe_dataset_load(
+        "CORINE",
+        catalog.corine,
+        required=True,
+    )
+    if corine_path is None:
+        raise RuntimeError("CORINE dataset is required but not available")
     corine_clip = gis.clip_vector(corine_path, buffered_aoi, "corine_clipped.gpkg")
     land_cover_summary = summarize_land_cover(corine_clip)
     gis.save_summary(land_cover_summary, "land_cover_summary.json")
@@ -98,11 +126,11 @@ def main() -> None:
     biodiversity_prediction = {}
     training_data_path = catalog.biodiversity_training()
 
-    try:
-        natura_path = catalog.natura2000()
-    except FileNotFoundError:
-        logger.warning("No Natura 2000 dataset found; biodiversity analysis limited.")
-        natura_path = None
+    natura_path = safe_dataset_load(
+        "Natura 2000",
+        catalog.natura2000,
+        required=False,
+    )
 
     biodiversity_layers = {}
     if natura_path:
@@ -194,36 +222,83 @@ def main() -> None:
     # Distance-to-receptor calculations
     logger.info("Calculating distances to sensitive receptors...")
     
+    # Load WDPA (global protected areas) as fallback/complement to Natura 2000
+    wdpa_path = safe_dataset_load("WDPA", catalog.wdpa, required=False)
+    wdpa_clip = None
+    if wdpa_path:
+        try:
+            wdpa_clip = gis.clip_vector(wdpa_path, buffered_aoi, "receptors/wdpa_clipped.gpkg")
+            if not wdpa_clip.empty:
+                logger.info("Loaded %d WDPA protected area features", len(wdpa_clip))
+        except Exception as exc:
+            logger.warning("Could not clip WDPA dataset: %s", exc)
+            wdpa_clip = None
+    
     # Load settlements from GADM (administrative level 1 or 2 can represent cities/towns)
     settlements_clip = None
-    try:
-        gadm_path = catalog.gadm(level=1)  # Level 1 = states/provinces (often contain major cities)
-        if gadm_path:
+    gadm_path = safe_dataset_load("GADM Level 1", lambda: catalog.gadm(level=1), required=False)
+    if gadm_path:
+        try:
             settlements_clip = gis.clip_vector(gadm_path, buffered_aoi, "receptors/settlements_clipped.gpkg")
             if settlements_clip.empty:
                 # Try level 0 (country) as fallback
-                gadm_path = catalog.gadm(level=0)
+                gadm_path = safe_dataset_load("GADM Level 0", lambda: catalog.gadm(level=0), required=False)
                 if gadm_path:
                     settlements_clip = gis.clip_vector(gadm_path, buffered_aoi, "receptors/settlements_clipped.gpkg")
-            logger.info("Loaded %d settlement features for receptor analysis", len(settlements_clip) if not settlements_clip.empty else 0)
-    except Exception as exc:
-        logger.warning("Could not load settlements from GADM: %s", exc)
-        settlements_clip = None
+            if not settlements_clip.empty:
+                logger.info("Loaded %d settlement features for receptor analysis", len(settlements_clip))
+        except Exception as exc:
+            logger.warning("Could not clip GADM dataset for settlements: %s", exc)
+            settlements_clip = None
     
     # Load water bodies from rivers dataset
+    rivers_path = safe_dataset_load("Rivers", catalog.rivers, required=False)
     water_bodies_clip = None
-    try:
-        rivers_path = catalog.rivers()
-        if rivers_path:
+    if rivers_path:
+        try:
             water_bodies_clip = gis.clip_vector(rivers_path, buffered_aoi, "receptors/rivers_clipped.gpkg")
-            logger.info("Loaded %d water body features for receptor analysis", len(water_bodies_clip) if not water_bodies_clip.empty else 0)
-    except Exception as exc:
-        logger.warning("Could not load water bodies from rivers dataset: %s", exc)
-        water_bodies_clip = None
+            if not water_bodies_clip.empty:
+                logger.info("Loaded %d water body features for receptor analysis", len(water_bodies_clip))
+        except Exception as exc:
+            logger.warning("Could not clip rivers dataset: %s", exc)
+            water_bodies_clip = None
+    
+    # Load regional context (Eurostat NUTS) for analysis metadata
+    nuts_path = safe_dataset_load("Eurostat NUTS", catalog.eurostat_nuts, required=False)
+    nuts_context = None
+    if nuts_path:
+        try:
+            nuts_clip = gis.clip_vector(nuts_path, buffered_aoi, "context/nuts_clipped.gpkg")
+            if not nuts_clip.empty:
+                nuts_context = {
+                    "nuts_regions": len(nuts_clip),
+                    "nuts_codes": nuts_clip.get("NUTS_ID", []).tolist() if "NUTS_ID" in nuts_clip.columns else [],
+                }
+                logger.info("Loaded NUTS regional context: %d regions", len(nuts_clip))
+        except Exception as exc:
+            logger.debug("Could not clip Eurostat NUTS dataset: %s", exc)
+            nuts_context = None
+    
+    # Load country boundaries (Natural Earth) for context
+    country_path = safe_dataset_load("Natural Earth", catalog.natural_earth_admin, required=False)
+    country_context = None
+    if country_path:
+        try:
+            country_clip = gis.clip_vector(country_path, buffered_aoi, "context/country_clipped.gpkg")
+            if not country_clip.empty:
+                country_context = {
+                    "countries": country_clip.get("NAME", []).tolist() if "NAME" in country_clip.columns else [],
+                    "country_count": len(country_clip),
+                }
+                logger.info("Loaded country boundaries context: %d countries", len(country_clip))
+        except Exception as exc:
+            logger.debug("Could not clip Natural Earth country dataset: %s", exc)
+            country_context = None
     
     receptor_analysis = calculate_distance_to_receptors(
         aoi=aoi,
         protected_areas=natura_clip if not natura_clip.empty else None,
+        protected_areas_global=wdpa_clip if wdpa_clip is not None and not wdpa_clip.empty else None,
         settlements=settlements_clip if settlements_clip is not None and not settlements_clip.empty else None,
         water_bodies=water_bodies_clip if water_bodies_clip is not None and not water_bodies_clip.empty else None,
         max_distance_km=50.0,
@@ -522,6 +597,10 @@ def main() -> None:
         "project_type": args.project_type,
         "created_at": run_timestamp.isoformat(),
         "status": "completed",
+        "context": {
+            "nuts_regions": nuts_context if nuts_context else None,
+            "country_boundaries": country_context if country_context else None,
+        },
         "outputs": {
             "biodiversity_layers": biodiversity_layers,
             "summaries": {

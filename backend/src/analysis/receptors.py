@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import geopandas as gpd
+import pandas as pd
 from shapely.geometry import Point
 
 from ..logging_utils import get_logger
@@ -45,6 +46,7 @@ class ReceptorAnalysis:
 def calculate_distance_to_receptors(
     aoi: gpd.GeoDataFrame,
     protected_areas: gpd.GeoDataFrame | None = None,
+    protected_areas_global: gpd.GeoDataFrame | None = None,
     settlements: gpd.GeoDataFrame | None = None,
     water_bodies: gpd.GeoDataFrame | None = None,
     max_distance_km: float = 50.0,
@@ -54,7 +56,8 @@ def calculate_distance_to_receptors(
 
     Args:
         aoi: Area of Interest GeoDataFrame
-        protected_areas: Protected areas (Natura 2000, national parks, etc.)
+        protected_areas: Protected areas (Natura 2000, regional protected areas)
+        protected_areas_global: Global protected areas (WDPA, etc.) - used as fallback
         settlements: Human settlements (cities, towns)
         water_bodies: Water bodies (rivers, lakes, wetlands)
         max_distance_km: Maximum distance to search for receptors (default: 50 km)
@@ -76,15 +79,39 @@ def calculate_distance_to_receptors(
     analysis = ReceptorAnalysis(aoi_centroid=aoi_centroid)
     all_distances: list[ReceptorDistance] = []
 
-    # Calculate distance to protected areas
+    # Combine protected areas: prefer regional (Natura 2000), fallback to global (WDPA)
+    combined_protected = None
     if protected_areas is not None and not protected_areas.empty:
+        combined_protected = protected_areas.copy()
+        if protected_areas_global is not None and not protected_areas_global.empty:
+            # Ensure same CRS
+            if combined_protected.crs != protected_areas_global.crs:
+                protected_areas_global = protected_areas_global.to_crs(combined_protected.crs)
+            # Combine datasets
+            combined_protected = gpd.GeoDataFrame(
+                pd.concat([combined_protected, protected_areas_global], ignore_index=True),
+                crs=combined_protected.crs
+            )
+    elif protected_areas_global is not None and not protected_areas_global.empty:
+        combined_protected = protected_areas_global.copy()
+
+    # Calculate distance to protected areas (combined regional + global)
+    if combined_protected is not None and not combined_protected.empty:
+        # Try Natura 2000 field names first, then WDPA field names
+        name_field = "SITENAME" if "SITENAME" in combined_protected.columns else (
+            "NAME" if "NAME" in combined_protected.columns else "name"
+        )
+        id_field = "SITECODE" if "SITECODE" in combined_protected.columns else (
+            "WDPAID" if "WDPAID" in combined_protected.columns else "id"
+        )
+        
         nearest_protected = _find_nearest_receptor(
             aoi_centroid,
-            protected_areas,
+            combined_protected,
             "protected_area",
             max_distance_km,
-            name_field="SITENAME",
-            id_field="SITECODE",
+            name_field=name_field,
+            id_field=id_field,
         )
         if nearest_protected:
             analysis.nearest_protected_area = nearest_protected
@@ -93,11 +120,11 @@ def calculate_distance_to_receptors(
             # Find all protected areas within max distance
             all_protected = _find_all_receptors(
                 aoi_centroid,
-                protected_areas,
+                combined_protected,
                 "protected_area",
                 max_distance_km,
-                name_field="SITENAME",
-                id_field="SITECODE",
+                name_field=name_field,
+                id_field=id_field,
             )
             all_distances.extend(all_protected)
 
