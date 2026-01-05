@@ -1,5 +1,7 @@
 # Large geospatial datasets (too large for git)
 data2/
+data/
+tmp/
 *.gpkg
 *.shp
 *.shx
@@ -7,10 +9,16 @@ data2/
 *.prj
 *.cpg
 *.osm.pbf
-
-# Generated analysis results (too large for git)
-data/
-tmp/
+*.zip
+*.sbn
+*.sbx
+*.csv
+*.geojson
+*.mbtiles
+*.tif
+*.tiff
+*.h5
+*.hdf5
 
 # Test files
 test_aoi*.geojson

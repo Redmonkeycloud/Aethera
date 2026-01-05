@@ -23,7 +23,9 @@ src/api/routes/biodiversity.py
 src/api/routes/cache.py
 src/api/routes/countries.py
 src/api/routes/indicators.py
+src/api/routes/layers.py
 src/api/routes/projects.py
+src/api/routes/reports.py
 src/api/routes/runs.py
 src/api/routes/tasks.py
 src/config/base_settings.py
@@ -43,8 +45,11 @@ src/legal/loader.py
 src/legal/parser.py
 src/legal/rules.py
 src/reporting/__init__.py
+src/reporting/embeddings.py
 src/reporting/engine.py
+src/reporting/exports.py
 src/reporting/report_memory.py
+src/reporting/report_memory_db.py
 src/storage/__init__.py
 src/storage/base.py
 src/storage/factory.py

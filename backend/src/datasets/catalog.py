@@ -21,14 +21,38 @@ class DatasetCatalog:
                 return matches[0]
         return None
 
-    def corine(self) -> Path:
-        path = self._search("corine", ["*.gpkg", "*.shp"])
+    def corine(self, country: Optional[str] = None) -> Path:
+        """Get CORINE Land Cover dataset, optionally country-specific.
+        
+        Args:
+            country: Country code (e.g., 'ITA', 'GRC'). If None, returns full dataset.
+        """
+        if country:
+            # Try country-specific file first - prefer GeoJSON (pre-converted, faster)
+            country_upper = country.upper()
+            country_path = self._search("corine", [f"corine_{country_upper}.geojson", f"corine_{country_upper}.shp", f"corine_{country_upper}.gpkg"])
+            if country_path:
+                return country_path
+        # Fall back to full dataset - prefer GeoJSON if available
+        path = self._search("corine", ["*.geojson", "*.shp", "*.gpkg"])
         if not path:
             raise FileNotFoundError("No CORINE dataset found under data source directory.")
         return path
 
-    def natura2000(self) -> Optional[Path]:
-        return self._search("protected_areas/natura2000", ["*.gpkg", "*.shp"])
+    def natura2000(self, country: Optional[str] = None) -> Optional[Path]:
+        """Get Natura 2000 dataset, optionally country-specific.
+        
+        Args:
+            country: Country code (e.g., 'ITA', 'GRC'). If None, returns full dataset.
+        """
+        if country:
+            # Try country-specific file first
+            country_upper = country.upper()
+            country_path = self._search(f"protected_areas/natura2000", [f"natura2000_{country_upper}.shp", f"natura2000_{country_upper}.gpkg"])
+            if country_path:
+                return country_path
+        # Fall back to full dataset
+        return self._search("protected_areas/natura2000", ["Natura2000*.shp", "Natura2000*.gpkg", "*.gpkg", "*.shp"])
 
     def gadm(self, level: int = 2) -> Optional[Path]:
         pattern = f"*_{level}.shp"

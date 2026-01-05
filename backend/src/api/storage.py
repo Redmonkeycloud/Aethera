@@ -47,6 +47,16 @@ class ProjectStore:
         self._write(projects)
         return project
 
+    def delete_project(self, project_id: str) -> bool:
+        """Delete a project by ID. Returns True if deleted, False if not found."""
+        projects = self._read()
+        original_count = len(projects)
+        projects = [p for p in projects if p["id"] != project_id]
+        if len(projects) < original_count:
+            self._write(projects)
+            return True
+        return False
+
 
 class RunManifestStore:
     def __init__(self, data_dir: Path, processed_dir_name: str) -> None:

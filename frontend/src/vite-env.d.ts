@@ -7,9 +7,19 @@ declare namespace GeoJSON {
     coordinates: unknown
   }
 
+  interface Polygon {
+    type: 'Polygon'
+    coordinates: [number, number][][]
+  }
+
+  interface MultiPolygon {
+    type: 'MultiPolygon'
+    coordinates: [number, number][][][]
+  }
+
   interface Feature {
     type: 'Feature'
-    geometry: Geometry
+    geometry: Geometry | Polygon | MultiPolygon
     properties?: Record<string, unknown>
   }
 

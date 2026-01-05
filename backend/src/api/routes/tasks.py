@@ -18,6 +18,11 @@ async def get_task_status(task_id: str) -> TaskStatus:
 
     Use this endpoint to poll for task completion.
     """
+    import traceback
+    from ...logging_utils import get_logger
+    
+    logger = get_logger(__name__)
+    
     try:
         task_info = tracker.get_task_status(task_id)
         return TaskStatus(
@@ -29,7 +34,9 @@ async def get_task_status(task_id: str) -> TaskStatus:
             error=task_info.error,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error getting task status: {str(exc)}")
+        error_msg = f"Error getting task status: {str(exc)}"
+        logger.error("%s\n%s", error_msg, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.delete("/{task_id}")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
@@ -21,7 +21,7 @@ class ModelRunRecord:
     candidate_models: Optional[list[str]]
     selected_model: Optional[str]
     metrics: Dict[str, Any]
-    created_at: datetime = datetime.utcnow()
+    created_at: datetime = field(default_factory=datetime.utcnow)
     id: str = ""
 
     def as_db_tuple(self) -> tuple:

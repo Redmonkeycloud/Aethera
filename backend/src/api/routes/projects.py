@@ -29,6 +29,14 @@ async def get_project(project_id: str) -> Project:
     return project
 
 
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(project_id: str) -> None:
+    """Delete a project."""
+    deleted = store.delete_project(project_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+
 @router.post("/{project_id}/runs", response_model=RunCreateResponse, status_code=202)
 async def create_run(project_id: str, payload: RunCreate) -> RunCreateResponse:
     """

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import geopandas as gpd
@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def ensure_run_dirs(base_dir: Path) -> Path:
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_dir = base_dir / f"run_{timestamp}"
     (run_dir / settings.raw_dir_name).mkdir(parents=True, exist_ok=True)
     (run_dir / settings.processed_dir_name).mkdir(parents=True, exist_ok=True)
@@ -75,7 +75,7 @@ def main() -> None:
     base_dir = Path(args.output_dir) if args.output_dir else settings.data_dir
     run_dir = ensure_run_dirs(base_dir)
     run_id = run_dir.name
-    run_timestamp = datetime.utcnow()
+    run_timestamp = datetime.now(timezone.utc)
 
     configure_logging(run_dir / "logs")
     logger.info("Starting run in %s", run_dir)

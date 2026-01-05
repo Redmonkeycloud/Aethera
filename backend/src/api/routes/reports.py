@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,9 @@ from ...reporting.engine import ReportEngine
 from ...reporting.exports import ReportExporter
 from ...reporting.report_memory import ReportEntry
 from ...reporting.report_memory_db import DatabaseReportMemoryStore
+from ...reporting.text_generator import TextGenerator
+from ...reporting.visualizations import VisualizationGenerator
+from ...reporting.report_builder import build_enhanced_report_context
 from ...api.storage import RunManifestStore
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -27,6 +31,8 @@ memory_store = DatabaseReportMemoryStore(db_client)
 templates_dir = Path(__file__).parent.parent.parent / "reporting" / "templates"
 report_engine = ReportEngine(templates_dir=templates_dir, memory_store=memory_store, use_rag=True)
 exporter = ReportExporter()
+text_generator = TextGenerator()
+viz_generator = VisualizationGenerator()
 
 
 class ReportGenerateRequest(BaseModel):
@@ -82,21 +88,25 @@ async def generate_report(request: ReportGenerateRequest) -> dict:
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Run not found: {request.run_id}")
 
-    # Build context from run data
-    context = {
-        "project": {
-            "name": run_dict.get("project_name") or run_dict.get("name", "Unknown Project"),
-            "type": run_dict.get("project_type", "unknown"),
-            "capacity_mw": run_dict.get("capacity_mw", 0),
-        },
-        "indicators": run_dict.get("indicators", {}),
-        "emissions": run_dict.get("emissions", {}),
-        "biodiversity": run_dict.get("biodiversity", {}),
-        "ai": run_dict.get("ai_models", {}),
-        "legal_summary": run_dict.get("legal_summary", "No legal assessment available."),
-        "executive_summary": run_dict.get("executive_summary", "Executive summary not available."),
-        "land_cover": run_dict.get("land_cover", []),
-    }
+    # Build enhanced context with visualizations and explanations
+    if request.template_name == "enhanced_report.md.jinja":
+        context = build_enhanced_report_context(request.run_id, run_dict, text_generator, viz_generator)
+    else:
+        # Fallback to basic context for other templates
+        context = {
+            "project": {
+                "name": run_dict.get("project_name") or run_dict.get("name", "Unknown Project"),
+                "type": run_dict.get("project_type", "unknown"),
+                "capacity_mw": run_dict.get("capacity_mw", 0),
+            },
+            "indicators": run_dict.get("indicators", {}),
+            "emissions": run_dict.get("emissions", {}),
+            "biodiversity": run_dict.get("biodiversity", {}),
+            "ai": run_dict.get("ai_models", {}),
+            "legal_summary": run_dict.get("legal_summary", "No legal assessment available."),
+            "executive_summary": run_dict.get("executive_summary", "Executive summary not available."),
+            "land_cover": run_dict.get("land_cover", []),
+        }
 
     # Generate report
     try:

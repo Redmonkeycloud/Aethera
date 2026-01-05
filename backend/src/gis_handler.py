@@ -20,7 +20,8 @@ class GISHandler:
 
     def clip_vector(self, dataset_path: Path, aoi: GeoDataFrame, output_name: str) -> GeoDataFrame:
         logger.info("Clipping dataset %s", dataset_path)
-        bbox = aoi.total_bounds
+        # Convert numpy array to tuple (pyogrio expects tuple, not numpy array)
+        bbox = tuple(aoi.total_bounds)
         gdf = gpd.read_file(dataset_path, bbox=bbox)
         if gdf.empty:
             logger.warning("Dataset %s returned no features within AOI bbox.", dataset_path)

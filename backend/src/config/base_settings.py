@@ -32,6 +32,28 @@ class AppSettings(BaseSettings):
     openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
     embedding_model: str = Field("all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")  # Default: sentence-transformers model
 
+    def model_post_init(self, __context) -> None:
+        """Resolve relative paths to absolute paths relative to project root."""
+        # This file is at: backend/src/config/base_settings.py
+        # Project root is 4 levels up: backend/src/config -> backend/src -> backend -> project_root
+        config_file = Path(__file__).resolve()
+        project_root = config_file.parent.parent.parent.parent
+        
+        # Resolve relative paths (handle both Unix and Windows path separators)
+        if isinstance(self.data_dir, Path):
+            path_str = str(self.data_dir).replace("..\\", "").replace("../", "")
+            if not self.data_dir.is_absolute() and (str(self.data_dir).startswith("../") or str(self.data_dir).startswith("..\\")):
+                self.data_dir = (project_root / path_str).resolve()
+            elif not self.data_dir.is_absolute():
+                self.data_dir = (project_root / self.data_dir).resolve()
+            
+        if isinstance(self.data_sources_dir, Path):
+            path_str = str(self.data_sources_dir).replace("..\\", "").replace("../", "")
+            if not self.data_sources_dir.is_absolute() and (str(self.data_sources_dir).startswith("../") or str(self.data_sources_dir).startswith("..\\")):
+                self.data_sources_dir = (project_root / path_str).resolve()
+            elif not self.data_sources_dir.is_absolute():
+                self.data_sources_dir = (project_root / self.data_sources_dir).resolve()
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -39,4 +61,3 @@ class AppSettings(BaseSettings):
 
 
 settings = AppSettings()
-

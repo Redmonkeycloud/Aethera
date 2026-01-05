@@ -48,8 +48,20 @@ class TaskTracker:
 
         Returns:
             TaskInfo with current status
+            
+        Raises:
+            ConnectionError: If Celery broker (Redis) is not available
+            Exception: Other errors accessing task status
         """
-        result = AsyncResult(task_id, app=celery_app)
+        try:
+            result = AsyncResult(task_id, app=celery_app)
+        except Exception as e:
+            # If we can't even create AsyncResult, Redis is likely not available
+            raise ConnectionError(
+                f"Cannot connect to Celery broker (Redis). "
+                f"Make sure Redis is running and REDIS_URL is configured correctly. "
+                f"Original error: {str(e)}"
+            ) from e
 
         # Map Celery states to our TaskStatus
         state_map = {
@@ -61,10 +73,24 @@ class TaskTracker:
             "REVOKED": TaskStatus.REVOKED,
         }
 
-        status = state_map.get(result.state, TaskStatus.PENDING)
+        try:
+            # Try to get task state - this may fail if Redis is not connected
+            task_state = result.state
+        except Exception as e:
+            raise ConnectionError(
+                f"Cannot get task state from Celery broker (Redis). "
+                f"Make sure Redis is running. Original error: {str(e)}"
+            ) from e
+
+        status = state_map.get(task_state, TaskStatus.PENDING)
 
         # Extract metadata
-        meta = result.info or {}
+        try:
+            meta = result.info or {}
+        except Exception:
+            # If we can't get info, just use empty dict
+            meta = {}
+
         if isinstance(meta, dict):
             progress = meta.get("progress") or meta
             error = meta.get("error")

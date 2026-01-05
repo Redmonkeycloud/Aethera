@@ -132,12 +132,23 @@ class BiodiversityEnsemble:
             dataset_source = "synthetic"
         self.dataset_source = dataset_source
 
+        # Check that we have at least 2 classes
+        unique_classes = np.unique(y)
+        if len(unique_classes) < 2:
+            logger.warning(
+                "Training data contains only %d class(es): %s. Using synthetic data instead.",
+                len(unique_classes), unique_classes
+            )
+            X, y = self._generate_training_data()
+            dataset_source = "synthetic (fallback)"
+            self.dataset_source = dataset_source
+
         models: List[Tuple[str, Any]] = []
 
         lr_pipeline = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(max_iter=500, multi_class="multinomial")),
+                ("clf", LogisticRegression(max_iter=500)),
             ]
         )
         lr_pipeline.fit(X, y)

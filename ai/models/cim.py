@@ -176,13 +176,24 @@ class CIMEnsemble:
             dataset_source = "synthetic"
         self.dataset_source = dataset_source
 
+        # Check that we have at least 2 classes
+        unique_classes = np.unique(y)
+        if len(unique_classes) < 2:
+            logger.warning(
+                "Training data contains only %d class(es): %s. Using synthetic data instead.",
+                len(unique_classes), unique_classes
+            )
+            X, y = self._generate_training_data()
+            dataset_source = "synthetic (fallback)"
+            self.dataset_source = dataset_source
+
         models: list[tuple[str, Any]] = []
 
         # Logistic Regression
         lr_pipeline = Pipeline(
             [
                 ("scaler", StandardScaler()),
-                ("clf", LogisticRegression(max_iter=500, multi_class="multinomial")),
+                ("clf", LogisticRegression(max_iter=500)),
             ]
         )
         lr_pipeline.fit(X, y)
@@ -221,10 +232,15 @@ class CIMEnsemble:
             proba = model.predict_proba([x])[0]
             probabilities.append(proba)
             pred_idx = int(np.argmax(proba))
+            # Map prediction index to label (handle case where model has different number of classes)
+            if pred_idx < len(IMPACT_LABELS):
+                pred_label = IMPACT_LABELS[pred_idx]
+            else:
+                pred_label = f"class_{pred_idx}"  # Fallback label
             details.append(
                 {
                     "model": name,
-                    "prediction": IMPACT_LABELS[pred_idx],
+                    "prediction": pred_label,
                     "confidence": float(proba[pred_idx]),
                 }
             )
@@ -232,7 +248,13 @@ class CIMEnsemble:
         # Ensemble prediction (average probabilities)
         avg_prob = np.mean(probabilities, axis=0)
         final_idx = int(np.argmax(avg_prob))
-        impact_score = float(np.dot(avg_prob, np.array([10, 30, 50, 75, 95])))
+        # Score array must match number of classes in IMPACT_LABELS (5 classes)
+        score_values = np.array([10, 30, 50, 75, 95])
+        if len(avg_prob) != len(score_values):
+            # Adjust score_values to match actual number of classes
+            n_classes = len(avg_prob)
+            score_values = np.linspace(10, 95, n_classes)
+        impact_score = float(np.dot(avg_prob, score_values))
 
         # Key drivers
         drivers = []
@@ -249,9 +271,17 @@ class CIMEnsemble:
         if not drivers:
             drivers.append("Moderate cumulative impact based on multiple factors")
 
+        # Map category index to label (handle case where model has different number of classes)
+        if final_idx < len(IMPACT_LABELS):
+            category = IMPACT_LABELS[final_idx]
+        else:
+            # Fallback if index is out of bounds
+            category = IMPACT_LABELS[-1] if IMPACT_LABELS else "unknown"
+            logger.warning("CIM prediction index %d out of bounds for IMPACT_LABELS. Using fallback.", final_idx)
+        
         return {
             "score": impact_score,
-            "category": IMPACT_LABELS[final_idx],
+            "category": category,
             "confidence": float(avg_prob[final_idx]),
             "model_details": details,
             "features": features,

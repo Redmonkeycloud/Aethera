@@ -1,0 +1,244 @@
+{# Enhanced report template with visualizations and explanations #}
+# Environmental Impact Assessment Report
+## {{ project.name }}
+
+**Project Type:** {{ project.type }}  
+**Country:** {{ project.country if project.country else "N/A" }}  
+**Assessment Date:** {{ assessment_date if assessment_date else "N/A" }}  
+**Run ID:** {{ run_id if run_id else "N/A" }}
+
+---
+
+## Executive Summary
+
+{{ executive_summary if executive_summary else "Executive summary will be generated based on the analysis results." }}
+
+---
+
+## 1. Project Description
+
+**Project Type:** {{ project.type }}  
+**Capacity:** {{ project.capacity_mw if project.capacity_mw else "N/A" }} MW  
+**Area of Interest:** {{ indicators.aoi_area_km2 if indicators.aoi_area_km2 else "N/A" }} km²
+
+{% if project.description %}
+{{ project.description }}
+{% endif %}
+
+---
+
+## 2. Biodiversity Assessment
+
+{% if biodiversity %}
+### Biodiversity Sensitivity Score
+
+{% if biodiversity.score is defined %}
+**Score:** {{ "%.2f"|format(biodiversity.score) }} / 100
+
+{% if biodiversity.explanation %}
+{{ biodiversity.explanation }}
+{% else %}
+The biodiversity sensitivity score evaluates the potential impact on protected species and habitats. Higher scores indicate greater sensitivity and potential impact on local ecosystems.
+{% endif %}
+
+{% if biodiversity_chart %}
+![Biodiversity Score Scale]({{ biodiversity_chart }})
+{% endif %}
+{% endif %}
+
+### Key Findings
+- **Sensitivity Level:** {{ biodiversity.sensitivity_level if biodiversity.sensitivity_level else "Moderate" }}
+- **Protected Areas Overlap:** {{ biodiversity.protected_areas_overlap if biodiversity.protected_areas_overlap else "N/A" }}
+- **Species Richness:** {{ biodiversity.species_richness if biodiversity.species_richness else "N/A" }}
+
+{% if biodiversity.summary %}
+{{ biodiversity.summary }}
+{% endif %}
+{% else %}
+Biodiversity assessment data not available.
+{% endif %}
+
+---
+
+## 3. Carbon Emissions Analysis
+
+{% if emissions %}
+### Emissions Overview
+
+{% if emissions_chart %}
+![Emissions Comparison]({{ emissions_chart }})
+{% endif %}
+
+| Category | Value (tCO₂e) |
+|----------|---------------|
+| **Baseline Emissions** | {{ "%.2f"|format(emissions.baseline_tco2e) if emissions.baseline_tco2e is defined else "N/A" }} |
+| **Construction Emissions** | {{ "%.2f"|format(emissions.project_construction_tco2e) if emissions.project_construction_tco2e is defined else "N/A" }} |
+| **Annual Operation Emissions** | {{ "%.2f"|format(emissions.project_operation_tco2e_per_year) if emissions.project_operation_tco2e_per_year is defined else "N/A" }} |
+| **Net Difference** | {{ "%.2f"|format(emissions.net_difference_tco2e) if emissions.net_difference_tco2e is defined else "N/A" }} |
+
+{% if emissions.explanation %}
+{{ emissions.explanation }}
+{% else %}
+This section compares baseline carbon emissions with projected project emissions. The net difference represents the change in carbon footprint due to the project.
+{% endif %}
+
+{% else %}
+Emissions data not available.
+{% endif %}
+
+---
+
+## 4. AI/ML Model Predictions
+
+{% if ai_models %}
+### Overall Assessment Scores
+
+{% if ai_models_chart %}
+![AI Model Scores]({{ ai_models_chart }})
+{% endif %}
+
+{% if ai_models.resm %}
+#### Renewable/Resilience Suitability Model (RESM)
+**Score:** {{ "%.2f"|format(ai_models.resm.score) if ai_models.resm.score is defined else "N/A" }} / 100
+
+{% if ai_models.resm.explanation %}
+{{ ai_models.resm.explanation }}
+{% else %}
+RESM evaluates the suitability of the location for renewable energy development based on environmental and technical factors. Higher scores indicate better suitability.
+{% endif %}
+{% endif %}
+
+{% if ai_models.ahsm %}
+#### Asset Hazard Susceptibility Model (AHSM)
+**Score:** {{ "%.2f"|format(ai_models.ahsm.score) if ai_models.ahsm.score is defined else "N/A" }} / 100
+
+{% if ai_models.ahsm.explanation %}
+{{ ai_models.ahsm.explanation }}
+{% else %}
+AHSM assesses the risk from natural hazards such as floods, wildfires, and extreme weather. Higher scores indicate greater hazard exposure.
+{% endif %}
+{% endif %}
+
+{% if ai_models.cim %}
+#### Cumulative Impact Model (CIM)
+**Score:** {{ "%.2f"|format(ai_models.cim.score) if ai_models.cim.score is defined else "N/A" }} / 100
+
+{% if ai_models.cim.explanation %}
+{{ ai_models.cim.explanation }}
+{% else %}
+CIM integrates biodiversity, suitability, and hazard assessments to provide a comprehensive cumulative impact score. This holistic view helps evaluate overall project risk.
+{% endif %}
+{% endif %}
+
+{% else %}
+AI/ML model predictions not available.
+{% endif %}
+
+---
+
+## 5. Environmental Key Performance Indicators (KPIs)
+
+{% if kpis %}
+| Indicator | Value | Unit |
+|-----------|-------|------|
+{% for key, value in kpis.items() %}
+| {{ key.replace("_", " ").title() }} | {{ value }} | {{ kpi_units[key] if kpi_units and key in kpi_units else "" }} |
+{% endfor %}
+
+{% if kpis.explanation %}
+{{ kpis.explanation }}
+{% endif %}
+{% else %}
+KPI data not available.
+{% endif %}
+
+---
+
+## 6. Land Cover Summary
+
+{% if land_cover %}
+| Land Cover Class | Area (ha) | Percentage |
+|------------------|-----------|------------|
+{% for row in land_cover %}
+| {{ row.class_code if row.class_code else row.get("class_code", "N/A") }} | {{ "%.2f"|format(row.total_area_ha if row.total_area_ha is defined else row.get("total_area_ha", 0)) }} | {{ "%.1f"|format(row.percentage if row.percentage is defined else row.get("percentage", 0)) }}% |
+{% endfor %}
+{% else %}
+Land cover data not available.
+{% endif %}
+
+---
+
+## 7. Legal Compliance Assessment
+
+{% if legal %}
+{% if legal.overall_compliant is defined %}
+**Overall Compliance Status:** {% if legal.overall_compliant %}✅ **COMPLIANT**{% else %}❌ **NON-COMPLIANT**{% endif %}
+
+{% if legal.summary %}
+{{ legal.summary }}
+{% endif %}
+
+{% if legal.critical_violations and legal.critical_violations|length > 0 %}
+### Critical Violations
+{% for violation in legal.critical_violations %}
+- **{{ violation.rule_name if violation.rule_name else "Unknown Rule" }}:** {{ violation.message if violation.message else "N/A" }}
+{% endfor %}
+{% endif %}
+
+{% if legal.warnings and legal.warnings|length > 0 %}
+### Warnings
+{% for warning in legal.warnings %}
+- **{{ warning.rule_name if warning.rule_name else "Unknown Rule" }}:** {{ warning.message if warning.message else "N/A" }}
+{% endfor %}
+{% endif %}
+{% else %}
+{{ legal_summary if legal_summary else "Legal compliance assessment not available." }}
+{% endif %}
+{% else %}
+Legal compliance data not available.
+{% endif %}
+
+---
+
+## 8. Recommendations
+
+{% if recommendations %}
+{% for recommendation in recommendations %}
+- {{ recommendation }}
+{% endfor %}
+{% else %}
+Based on the assessment results, key recommendations include:
+- Monitor biodiversity impacts during project implementation
+- Implement mitigation measures for identified risks
+- Comply with all legal requirements and address any violations
+- Regular monitoring and adaptive management recommended
+{% endif %}
+
+---
+
+## Appendices
+
+### Data Sources
+- CORINE Land Cover Dataset
+- Natura 2000 Protected Areas
+- GBIF Species Occurrence Data
+- OpenStreetMap Infrastructure Data
+
+### Methodologies
+- Biodiversity Assessment: Ensemble ML models
+- Emissions Calculation: IPCC Guidelines
+- Legal Compliance: Country-specific regulations
+
+### Model Details
+{% if ai_models %}
+- **RESM:** Ensemble regression models for suitability scoring
+- **AHSM:** Ensemble classification models for hazard assessment
+- **CIM:** Cumulative impact integration model
+- **Biodiversity Model:** Ensemble classification for sensitivity scoring
+{% endif %}
+
+---
+
+**Report Generated:** {{ report_date if report_date else "N/A" }}  
+**Assessment Version:** 1.0
+

@@ -23,9 +23,7 @@ export default function ProjectPage() {
   const { setSelectedProject } = useAppStore()
   const [drawingEnabled, setDrawingEnabled] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
-  const [layers, setLayers] = useState([
-    { id: 'aoi-draw-layer', name: 'AOI', visible: true },
-  ])
+  const [layers, setLayers] = useState<Array<{ id: string; name: string; visible: boolean }>>([])
 
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: ['project', projectId],
@@ -70,10 +68,98 @@ export default function ProjectPage() {
   }
 
   const handleLayerToggle = (layerId: string, visible: boolean) => {
-    setLayers((prev: typeof layers) =>
-      prev.map((l: typeof layers[0]) => (l.id === layerId ? { ...l, visible } : l))
+    if (mapInstance) {
+      // Toggle the actual map layer
+      if (mapInstance.getLayer(layerId)) {
+        mapInstance.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
+      }
+      // Also toggle outline layer if it exists
+      const outlineLayerId = `${layerId}-outline`
+      if (mapInstance.getLayer(outlineLayerId)) {
+        mapInstance.setLayoutProperty(outlineLayerId, 'visibility', visible ? 'visible' : 'none')
+      }
+    }
+    // Update state
+    setLayers((prev) =>
+      prev.map((l) => (l.id === layerId ? { ...l, visible } : l))
     )
   }
+
+  // Dynamically discover layers from the map
+  useEffect(() => {
+    if (!mapInstance || !mapInstance.loaded()) return
+
+    const discoverLayers = () => {
+      const discoveredLayers: Array<{ id: string; name: string; visible: boolean }> = []
+      const allLayers = mapInstance.getStyle().layers || []
+
+      // Layer name mapping
+      const layerNames: Record<string, string> = {
+        'aoi-display-layer': 'AOI',
+        'base-natura2000-layer': 'Natura 2000',
+        'base-corine-layer': 'CORINE',
+      }
+
+      // Discover relevant layers
+      for (const layer of allLayers) {
+        // Skip base raster layer
+        if (layer.id === 'simple-tiles') continue
+        
+        // Skip outline layers (we'll show them with their parent)
+        if (layer.id.endsWith('-outline')) continue
+
+        const name = layerNames[layer.id] || layer.id.replace(/-layer$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        const visibility = mapInstance.getLayoutProperty(layer.id, 'visibility') as string
+        const visible = visibility !== 'none'
+
+        discoveredLayers.push({
+          id: layer.id,
+          name,
+          visible,
+        })
+      }
+
+      // Update layers state if changed
+      setLayers((prev) => {
+        // Check if layers actually changed
+        if (prev.length !== discoveredLayers.length) {
+          return discoveredLayers
+        }
+        const prevIds = new Set(prev.map(l => l.id))
+        const newIds = new Set(discoveredLayers.map(l => l.id))
+        if (prevIds.size !== newIds.size || [...prevIds].some(id => !newIds.has(id))) {
+          return discoveredLayers
+        }
+        return prev
+      })
+    }
+
+    // Discover layers when map loads
+    if (mapInstance.loaded()) {
+      discoverLayers()
+    } else {
+      mapInstance.once('load', discoverLayers)
+    }
+
+    // Re-discover when style changes (layers added/removed)
+    const handleStyleChange = () => {
+      setTimeout(discoverLayers, 100) // Small delay to ensure layers are added
+    }
+    mapInstance.on('styledata', handleStyleChange)
+    
+    // Also periodically check for new layers (in case styledata doesn't fire)
+    // This is a fallback for async layer additions
+    const intervalId = setInterval(() => {
+      if (mapInstance.loaded()) {
+        discoverLayers()
+      }
+    }, 2000) // Check every 2 seconds
+
+    return () => {
+      mapInstance.off('styledata', handleStyleChange)
+      clearInterval(intervalId)
+    }
+  }, [mapInstance])
 
   if (projectLoading) {
     return (

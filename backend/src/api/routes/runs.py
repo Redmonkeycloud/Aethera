@@ -135,8 +135,37 @@ async def get_run_legal(run_id: str) -> JSONResponse:
     if not legal_path.exists():
         raise HTTPException(status_code=404, detail="Legal evaluation not found for this run")
 
-    with open(legal_path, encoding="utf-8") as f:
-        legal_data = json.load(f)
+    try:
+        with open(legal_path, encoding="utf-8") as f:
+            legal_data = json.load(f)
+        # save_summary saves data as a list, so extract the first element if it's a list
+        if isinstance(legal_data, list) and len(legal_data) > 0:
+            legal_data = legal_data[0]
+    except json.JSONDecodeError as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Failed to parse legal_evaluation.json for run %s: %s", run_id, e)
+        # Return a graceful error response instead of crashing
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Legal evaluation file is corrupted or invalid JSON",
+                "detail": str(e),
+                "run_id": run_id
+            }
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Error reading legal_evaluation.json for run %s: %s", run_id, e)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Error reading legal evaluation",
+                "detail": str(e),
+                "run_id": run_id
+            }
+        )
 
     return JSONResponse(content=legal_data)
 
