@@ -1,0 +1,14 @@
+{
+  "dataset_source": "D:\\AETHERA_2.0\\data2\\biodiversity\\training.parquet",
+  "n_features": 6,
+  "n_models": 3,
+  "model_name": "biodiversity",
+  "vector_fields": [
+    "protected_overlap_pct",
+    "fragmentation_index",
+    "forest_ratio",
+    "protected_site_count",
+    "protected_overlap_ha",
+    "aoi_area_ha"
+  ]
+}

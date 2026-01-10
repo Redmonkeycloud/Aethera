@@ -1,0 +1,25 @@
+{
+  "dataset_source": "D:\\AETHERA_2.0\\data2\\resm\\training.parquet",
+  "n_features": 17,
+  "n_models": 3,
+  "model_name": "resm",
+  "vector_fields": [
+    "aoi_area_ha",
+    "natural_habitat_ratio",
+    "impervious_surface_ratio",
+    "agricultural_ratio",
+    "distance_to_protected_km",
+    "protected_area_overlap_pct",
+    "habitat_fragmentation_index",
+    "connectivity_index",
+    "ecosystem_service_value",
+    "soil_erosion_risk",
+    "distance_to_settlement_km",
+    "resource_efficiency_index",
+    "project_type_solar",
+    "project_type_wind",
+    "solar_ghi_kwh_m2_day",
+    "wind_speed_100m_ms",
+    "temperature_2m_c"
+  ]
+}

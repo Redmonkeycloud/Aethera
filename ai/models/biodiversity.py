@@ -15,6 +15,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from .pretrained import load_pretrained_bundle
+
 
 CLASS_LABELS = ["low", "moderate", "high", "very_high"]
 logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ class BiodiversityConfig:
     thresholds: dict | None = None
     vector_fields: list[str] | None = None
     training_data_path: Optional[str] = None
+    use_pretrained: bool = True
 
 
 class BiodiversityEnsemble:
@@ -44,7 +47,18 @@ class BiodiversityEnsemble:
             "aoi_area_ha",
         ]
         self.training_data_path = Path(self.config.training_data_path) if self.config.training_data_path else None
-        self._models = self._train_models()
+        self._models = self._load_or_train_models()
+
+    def _load_or_train_models(self) -> List[Tuple[str, Any]]:
+        if self.config.use_pretrained:
+            bundle = load_pretrained_bundle(self.config.name, here_file=__file__)
+            if bundle is not None:
+                if bundle.vector_fields:
+                    self.vector_fields = bundle.vector_fields
+                trained_on = bundle.dataset_source or "unknown"
+                self.dataset_source = f"pretrained:{bundle.model_path} (trained_on={trained_on})"
+                return bundle.models
+        return self._train_models()
 
     @staticmethod
     def _generate_training_data(n: int = 1500) -> Tuple[np.ndarray, np.ndarray]:

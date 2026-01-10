@@ -31,6 +31,13 @@ class AppSettings(BaseSettings):
     embedding_provider: str = Field("sentence-transformers", alias="EMBEDDING_PROVIDER")  # "openai" or "sentence-transformers"
     openai_api_key: str | None = Field(None, alias="OPENAI_API_KEY")
     embedding_model: str = Field("all-MiniLM-L6-v2", alias="EMBEDDING_MODEL")  # Default: sentence-transformers model
+    
+    # LLM configuration
+    llm_provider: str = Field("groq", alias="LLM_PROVIDER")  # "groq", "openai", "ollama"
+    groq_api_key: str | None = Field(None, alias="GROQ_API_KEY")
+    groq_model: str = Field("llama-3.1-8b-instant", alias="GROQ_MODEL")
+    llm_temperature: float = Field(0.3, alias="LLM_TEMPERATURE")
+    use_llm: bool = Field(True, alias="USE_LLM")
 
     def model_post_init(self, __context) -> None:
         """Resolve relative paths to absolute paths relative to project root."""

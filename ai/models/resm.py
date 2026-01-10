@@ -15,6 +15,8 @@ from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from .pretrained import load_pretrained_bundle
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class RESMConfig:
     version: str = "0.1.0"
     features: list[str] | None = None
     training_data_path: str | None = None
+    use_pretrained: bool = True
 
 
 class RESMEnsemble:
@@ -52,11 +55,26 @@ class RESMEnsemble:
             "resource_efficiency_index",
             "project_type_solar",
             "project_type_wind",
+            # Weather features
+            "solar_ghi_kwh_m2_day",
+            "wind_speed_100m_ms",
+            "temperature_2m_c",
         ]
         self.training_data_path = (
             Path(self.config.training_data_path) if self.config.training_data_path else None
         )
-        self._models = self._train_models()
+        self._models = self._load_or_train_models()
+
+    def _load_or_train_models(self) -> list[tuple[str, Any]]:
+        if self.config.use_pretrained:
+            bundle = load_pretrained_bundle(self.config.name, here_file=__file__)
+            if bundle is not None:
+                if bundle.vector_fields:
+                    self.vector_fields = bundle.vector_fields
+                trained_on = bundle.dataset_source or "unknown"
+                self.dataset_source = f"pretrained:{bundle.model_path} (trained_on={trained_on})"
+                return bundle.models
+        return self._train_models()
 
     @staticmethod
     def _generate_training_data(n: int = 2000) -> tuple[np.ndarray, np.ndarray]:

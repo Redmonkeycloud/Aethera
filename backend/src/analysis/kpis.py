@@ -113,7 +113,12 @@ def calculate_habitat_fragmentation_index(
     num_patches = len(dissolved)
 
     # Calculate total area
-    total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
+    # Ensure projected CRS for accurate area calculation
+    if land_cover_gdf.crs and land_cover_gdf.crs.is_geographic:
+        land_cover_proj = land_cover_gdf.to_crs("EPSG:3857")
+        total_area_ha = land_cover_proj.geometry.area.sum() / 10_000
+    else:
+        total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
 
     if total_area_ha <= 0:
         return 0.0
@@ -140,7 +145,12 @@ def calculate_patch_density(
 
     dissolved = land_cover_gdf.dissolve(by=class_field)
     num_patches = len(dissolved)
-    total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
+    # Ensure projected CRS for accurate area calculation
+    if land_cover_gdf.crs and land_cover_gdf.crs.is_geographic:
+        land_cover_proj = land_cover_gdf.to_crs("EPSG:3857")
+        total_area_ha = land_cover_proj.geometry.area.sum() / 10_000
+    else:
+        total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
 
     if total_area_ha <= 0:
         return 0.0
@@ -160,8 +170,18 @@ def calculate_edge_density(
         return 0.0
 
     # Calculate total perimeter of all polygons
-    total_perimeter_m = land_cover_gdf.geometry.boundary.length.sum()
-    total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
+    # Ensure projected CRS for accurate length calculation
+    if land_cover_gdf.crs and land_cover_gdf.crs.is_geographic:
+        land_cover_proj = land_cover_gdf.to_crs("EPSG:3857")
+        total_perimeter_m = land_cover_proj.geometry.boundary.length.sum()
+    else:
+        total_perimeter_m = land_cover_gdf.geometry.boundary.length.sum()
+    # Ensure projected CRS for accurate area calculation
+    if land_cover_gdf.crs and land_cover_gdf.crs.is_geographic:
+        land_cover_proj = land_cover_gdf.to_crs("EPSG:3857")
+        total_area_ha = land_cover_proj.geometry.area.sum() / 10_000
+    else:
+        total_area_ha = land_cover_gdf.geometry.area.sum() / 10_000
 
     if total_area_ha <= 0:
         return 0.0

@@ -166,6 +166,29 @@ class RunsAPI:
     def get_biodiversity_layer(run_id: str, layer: str) -> Dict[str, Any]:
         """Get biodiversity layer GeoJSON."""
         return _make_request("GET", f"/runs/{run_id}/biodiversity/{layer}")
+    
+    @staticmethod
+    def generate_explainability(run_id: str, model_name: str) -> Dict[str, Any]:
+        """Generate explainability artifacts for a model (on-demand)."""
+        return _make_request("POST", f"/runs/{run_id}/explainability/{model_name}/generate")
+    
+    @staticmethod
+    def get_explainability(run_id: str, model_name: str) -> Dict[str, Any]:
+        """Get explainability artifacts for a model."""
+        return _make_request("GET", f"/runs/{run_id}/explainability/{model_name}")
+    
+    @staticmethod
+    def get_explainability_plot_url(run_id: str, model_name: str, plot_name: str) -> str:
+        """Get URL for an explainability plot image."""
+        return f"{API_BASE_URL}/runs/{run_id}/explainability/{model_name}/plots/{plot_name}"
+    
+    @staticmethod
+    def export_explainability(run_id: str, model_name: str) -> bytes:
+        """Export explainability report as PDF."""
+        url = f"{API_BASE_URL}/runs/{run_id}/explainability/{model_name}/export"
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        return response.content
 
 
 class TasksAPI:

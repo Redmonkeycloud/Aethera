@@ -10,10 +10,13 @@ src/aethera_backend.egg-info/requires.txt
 src/aethera_backend.egg-info/top_level.txt
 src/analysis/ahsm_features.py
 src/analysis/biodiversity.py
+src/analysis/explainability.py
 src/analysis/kpis.py
 src/analysis/land_cover.py
+src/analysis/model_explainability.py
 src/analysis/receptors.py
 src/analysis/resm_features.py
+src/analysis/weather_features.py
 src/api/__init__.py
 src/api/app.py
 src/api/models.py
@@ -28,6 +31,7 @@ src/api/routes/projects.py
 src/api/routes/reports.py
 src/api/routes/runs.py
 src/api/routes/tasks.py
+src/api/routes/tiles.py
 src/config/base_settings.py
 src/datasets/biodiversity_sources.py
 src/datasets/cache.py
@@ -48,8 +52,12 @@ src/reporting/__init__.py
 src/reporting/embeddings.py
 src/reporting/engine.py
 src/reporting/exports.py
+src/reporting/langchain_llm.py
+src/reporting/report_builder.py
 src/reporting/report_memory.py
 src/reporting/report_memory_db.py
+src/reporting/text_generator.py
+src/reporting/visualizations.py
 src/storage/__init__.py
 src/storage/base.py
 src/storage/factory.py

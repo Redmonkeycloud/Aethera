@@ -20,19 +20,78 @@ from ...reporting.report_memory import ReportEntry
 from ...reporting.report_memory_db import DatabaseReportMemoryStore
 from ...reporting.text_generator import TextGenerator
 from ...reporting.visualizations import VisualizationGenerator
-from ...reporting.report_builder import build_enhanced_report_context
 from ...api.storage import RunManifestStore
+from ...logging_utils import get_logger
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+logger = get_logger(__name__)
 
-# Initialize services
-db_client = DatabaseClient(settings.postgres_dsn)
-memory_store = DatabaseReportMemoryStore(db_client)
+# Initialize services with error handling
+try:
+    db_client = DatabaseClient(settings.postgres_dsn)
+    memory_store = DatabaseReportMemoryStore(db_client)
+except Exception as e:
+    logger.warning(f"Failed to initialize database-backed memory store: {e}, using in-memory store")
+    from ...reporting.report_memory import ReportMemoryStore
+    memory_store = ReportMemoryStore()
+
 templates_dir = Path(__file__).parent.parent.parent / "reporting" / "templates"
-report_engine = ReportEngine(templates_dir=templates_dir, memory_store=memory_store, use_rag=True)
+report_engine = ReportEngine(
+    templates_dir=templates_dir,
+    memory_store=memory_store,
+    use_rag=True,
+    use_llm=True,
+)
 exporter = ReportExporter()
 text_generator = TextGenerator()
 viz_generator = VisualizationGenerator()
+
+
+def _build_basic_context(run_dict: dict) -> dict:
+    """Build basic context for report templates."""
+    # Extract project info
+    project_data = run_dict.get("project", {})
+    if isinstance(project_data, dict):
+        project_name = project_data.get("name") or run_dict.get("project_name") or run_dict.get("name", "Unknown Project")
+        project_type = project_data.get("type") or run_dict.get("project_type", "unknown")
+        project_country = project_data.get("country") or run_dict.get("country", "Unknown")
+        capacity_mw = project_data.get("capacity_mw") or run_dict.get("capacity_mw", 0)
+    else:
+        project_name = run_dict.get("project_name") or run_dict.get("name", "Unknown Project")
+        project_type = run_dict.get("project_type", "unknown")
+        project_country = run_dict.get("country", "Unknown")
+        capacity_mw = run_dict.get("capacity_mw", 0)
+    
+    # Extract AI model results
+    ai_models = run_dict.get("ai_models", {})
+    if not ai_models:
+        ai_models = {
+            "resm": run_dict.get("resm", {}),
+            "ahsm": run_dict.get("ahsm", {}),
+            "cim": run_dict.get("cim", {}),
+        }
+    
+    # Extract indicators for AOI area
+    indicators = run_dict.get("indicators", {})
+    aoi_area_km2 = indicators.get("aoi_area_km2") if isinstance(indicators, dict) else 0
+    
+    return {
+        "project": {
+            "name": project_name,
+            "type": project_type,
+            "country": project_country,
+            "capacity_mw": capacity_mw,
+            "aoi_area_km2": aoi_area_km2,
+        },
+        "indicators": indicators,
+        "emissions": run_dict.get("emissions", {}),
+        "biodiversity": run_dict.get("biodiversity", {}),
+        "ai": ai_models,
+        "legal_summary": run_dict.get("legal_summary", "No legal assessment available."),
+        "legal_compliance": run_dict.get("legal_compliance", {}),
+        "executive_summary": run_dict.get("executive_summary", "Executive summary not available."),
+        "land_cover": run_dict.get("land_cover", []),
+    }
 
 
 class ReportGenerateRequest(BaseModel):
@@ -88,32 +147,28 @@ async def generate_report(request: ReportGenerateRequest) -> dict:
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Run not found: {request.run_id}")
 
-    # Build enhanced context with visualizations and explanations
-    if request.template_name == "enhanced_report.md.jinja":
-        context = build_enhanced_report_context(request.run_id, run_dict, text_generator, viz_generator)
-    else:
-        # Fallback to basic context for other templates
-        context = {
-            "project": {
-                "name": run_dict.get("project_name") or run_dict.get("name", "Unknown Project"),
-                "type": run_dict.get("project_type", "unknown"),
-                "capacity_mw": run_dict.get("capacity_mw", 0),
-            },
-            "indicators": run_dict.get("indicators", {}),
-            "emissions": run_dict.get("emissions", {}),
-            "biodiversity": run_dict.get("biodiversity", {}),
-            "ai": run_dict.get("ai_models", {}),
-            "legal_summary": run_dict.get("legal_summary", "No legal assessment available."),
-            "executive_summary": run_dict.get("executive_summary", "Executive summary not available."),
-            "land_cover": run_dict.get("land_cover", []),
-        }
-
-    # Generate report
+    # Build context for report template
+    # Try to use enhanced context if template supports it, otherwise use basic context
     try:
-        content = report_engine.render(
-            request.template_name,
-            context,
-            enable_rag=request.enable_rag,
+        if request.template_name == "enhanced_report.md.jinja":
+            try:
+                from ...reporting.report_builder import build_enhanced_report_context
+                context = build_enhanced_report_context(request.run_id, run_dict, text_generator, viz_generator)
+            except ImportError:
+                logger.warning("build_enhanced_report_context not available, using basic context")
+                context = _build_basic_context(run_dict)
+        else:
+            context = _build_basic_context(run_dict)
+    except Exception as e:
+        logger.warning(f"Error building enhanced context: {e}, using basic context")
+        context = _build_basic_context(run_dict)
+
+    # Generate report with LLM enhancement
+    try:
+        content = report_engine.generate_report(
+            template_name=request.template_name,
+            context=context,
+            use_llm=True,  # Enable LLM generation by default
         )
 
         # Save to storage
@@ -155,7 +210,11 @@ async def generate_report(request: ReportGenerateRequest) -> dict:
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+        import traceback
+        error_detail = str(e)
+        error_traceback = traceback.format_exc()
+        logger.error(f"Failed to generate report: {error_detail}\n{error_traceback}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {error_detail}")
 
 
 @router.get("")
@@ -360,4 +419,129 @@ async def find_similar_reports(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to find similar reports: {str(e)}")
+
+
+@router.post("/llm/generate")
+async def generate_llm_content(
+    run_id: str,
+    content_type: Literal["executive_summary", "biodiversity_narrative", "ml_explanation", "legal_recommendations"] = Query(...),
+    model_name: str | None = Query(None),
+) -> dict:
+    """
+    Generate LLM content for specific sections.
+    
+    This endpoint allows on-demand generation of LLM-enhanced content for:
+    - Executive summaries
+    - Biodiversity narratives
+    - ML model explanations
+    - Legal compliance recommendations
+    """
+    from ...reporting.langchain_llm import LangChainLLMService
+    
+    # Load run data
+    run_store = RunManifestStore(settings.data_dir, settings.processed_dir_name)
+    try:
+        run_data = run_store.get_run(run_id)
+        if hasattr(run_data, "dict"):
+            run_dict = run_data.dict()
+        elif hasattr(run_data, "model_dump"):
+            run_dict = run_data.model_dump()
+        else:
+            run_dict = run_data if isinstance(run_data, dict) else {}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+
+    # Build context
+    context = _build_basic_context(run_dict)
+    project_context = context.get("project", {})
+    analysis_results = {
+        "biodiversity": context.get("biodiversity", {}),
+        "resm": context.get("ai", {}).get("resm", {}),
+        "ahsm": context.get("ai", {}).get("ahsm", {}),
+        "cim": context.get("ai", {}).get("cim", {}),
+        "emissions": context.get("emissions", {}),
+        "legal_summary": context.get("legal_summary", ""),
+        "indicators": context.get("indicators", {}),
+    }
+
+    # Initialize LLM service
+    llm_service = LangChainLLMService()
+    
+    if not llm_service.enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM service is not enabled. Please configure GROQ_API_KEY or set USE_LLM=true."
+        )
+
+    try:
+        generated_content = ""
+        
+        if content_type == "executive_summary":
+            # Get similar reports for RAG
+            from ...reporting.report_memory_db import DatabaseReportMemoryStore
+            similar_reports = []
+            if isinstance(memory_store, DatabaseReportMemoryStore):
+                try:
+                    query_text = project_context.get("description", "") or project_context.get("name", "")
+                    if query_text:
+                        similar = memory_store.find_similar(query_text, limit=3, min_similarity=0.7)
+                        similar_reports = [
+                            {"summary": entry.summary or "", "report_id": entry.report_id}
+                            for entry, _, _ in similar
+                        ]
+                except Exception:
+                    pass
+            
+            generated_content = llm_service.generate_executive_summary(
+                analysis_results=analysis_results,
+                project_context=project_context,
+                similar_reports=similar_reports,
+            )
+            
+        elif content_type == "biodiversity_narrative":
+            biodiversity = context.get("biodiversity", {})
+            if not biodiversity:
+                raise HTTPException(status_code=400, detail="No biodiversity data available for this run")
+            
+            generated_content = llm_service.generate_biodiversity_narrative(
+                biodiversity_data=biodiversity,
+                project_context=project_context,
+            )
+            
+        elif content_type == "ml_explanation":
+            if not model_name:
+                raise HTTPException(status_code=400, detail="model_name is required for ml_explanation")
+            
+            model_data = analysis_results.get(model_name.lower(), {})
+            if not model_data:
+                raise HTTPException(status_code=400, detail=f"No data available for model: {model_name}")
+            
+            generated_content = llm_service.explain_ml_prediction(
+                model_name=model_name.upper(),
+                prediction=model_data,
+            )
+            
+        elif content_type == "legal_recommendations":
+            legal_findings = {"summary": context.get("legal_summary", "")}
+            compliance_status = context.get("legal_compliance", {})
+            
+            generated_content = llm_service.generate_legal_recommendations(
+                legal_findings=legal_findings,
+                compliance_status=compliance_status,
+                project_context=project_context,
+            )
+        
+        return {
+            "run_id": run_id,
+            "content_type": content_type,
+            "model_name": model_name,
+            "content": generated_content,
+            "provider": llm_service.provider,
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate LLM content: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate LLM content: {str(e)}")
 

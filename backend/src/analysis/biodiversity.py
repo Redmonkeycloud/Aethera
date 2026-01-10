@@ -30,15 +30,25 @@ def compute_overlap_metrics(
             "fragmentation_index": 0.0,
         }, overlap
 
-    overlap_area = overlap.geometry.area.sum()
+    # NOTE: Protected areas may overlap each other; summing polygon areas can exceed AOI area.
+    # Use a unioned area estimate and cap overlap_pct to [0, 100].
+    try:
+        overlap_area = overlap.geometry.union_all().area  # shapely >= 2
+    except Exception:
+        overlap_area = overlap.unary_union.area
     aoi_area = aoi.geometry.area.sum()
 
     overlap_ha = overlap_area / 10_000
     aoi_ha = aoi_area / 10_000 if aoi_area > 0 else 1
-    overlap_pct = (overlap_ha / aoi_ha) * 100
+    overlap_pct = min(100.0, (overlap_ha / aoi_ha) * 100)
 
+    # Fragmentation: normalize by a reasonable max number of sites (heuristic).
+    # The previous implementation effectively saturated to 1.0 for any overlap when AOI is a single polygon.
     site_count = overlap.shape[0]
-    fragmentation_index = min(1.0, site_count / max(1, len(aoi))) if site_count else 0.0
+    if site_count:
+        fragmentation_index = min(1.0, site_count / 20.0)
+    else:
+        fragmentation_index = 0.0
 
     return {
         "protected_overlap_ha": overlap_ha,

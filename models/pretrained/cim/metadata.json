@@ -1,0 +1,22 @@
+{
+  "dataset_source": "D:\\AETHERA_2.0\\data2\\cim\\training.parquet",
+  "n_features": 14,
+  "n_models": 3,
+  "model_name": "cim",
+  "vector_fields": [
+    "resm_score",
+    "ahsm_score",
+    "biodiversity_score",
+    "distance_to_protected_km",
+    "protected_overlap_pct",
+    "habitat_fragmentation_index",
+    "connectivity_index",
+    "ecosystem_service_value",
+    "ghg_emissions_intensity",
+    "net_carbon_balance",
+    "land_use_efficiency",
+    "natural_habitat_ratio",
+    "soil_erosion_risk",
+    "water_regulation_capacity"
+  ]
+}

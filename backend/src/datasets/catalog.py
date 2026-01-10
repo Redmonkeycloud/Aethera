@@ -66,4 +66,40 @@ class DatasetCatalog:
 
     def biodiversity_training(self) -> Optional[Path]:
         return self._search("biodiversity", ["training.parquet", "training.csv", "*.parquet", "*.csv"])
+    
+    def resm_training(self) -> Optional[Path]:
+        """Get RESM training data."""
+        return self._search("resm", ["training.parquet", "training.csv", "*.parquet", "*.csv"])
+    
+    def ahsm_training(self) -> Optional[Path]:
+        """Get AHSM training data."""
+        return self._search("ahsm", ["training.parquet", "training.csv", "*.parquet", "*.csv"])
+    
+    def cim_training(self) -> Optional[Path]:
+        """Get CIM training data."""
+        return self._search("cim", ["training.parquet", "training.csv", "*.parquet", "*.csv"])
+    
+    def weather_solar_ghi(self, country: Optional[str] = None) -> Optional[Path]:
+        """Get solar radiation (GHI) data."""
+        if country:
+            country_path = self._search("weather", [f"solar_ghi_{country.upper()}.tif", f"solar_ghi_{country.upper()}.nc"])
+            if country_path:
+                return country_path
+        return self._search("weather", ["solar_ghi*.tif", "solar_ghi*.nc", "era5*solar*.nc"])
+    
+    def weather_wind_speed(self, country: Optional[str] = None, height: int = 100) -> Optional[Path]:
+        """Get wind speed data at specified height."""
+        if country:
+            country_path = self._search("weather", [f"wind_speed_{height}m_{country.upper()}.tif", f"wind_speed_{height}m_{country.upper()}.nc"])
+            if country_path:
+                return country_path
+        return self._search("weather", [f"wind_speed_{height}m*.tif", f"wind_speed_{height}m*.nc", "era5*wind*.nc"])
+    
+    def weather_summary(self, country: Optional[str] = None) -> Optional[Path]:
+        """Get weather data summary CSV."""
+        if country:
+            country_path = self._search("weather", [f"weather_summary_{country.upper()}.csv"])
+            if country_path:
+                return country_path
+        return self._search("weather", ["weather_summary*.csv"])
 

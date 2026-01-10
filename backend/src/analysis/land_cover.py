@@ -29,7 +29,12 @@ def summarize_land_cover(gdf: gpd.GeoDataFrame) -> List[Dict]:
         raise ValueError("Unable to identify CORINE class column.")
 
     data = gdf.copy()
-    data["area_ha"] = data.geometry.area / 10_000
+    # Ensure projected CRS for accurate area calculation
+    if data.crs and data.crs.is_geographic:
+        data_proj = data.to_crs("EPSG:3857")  # Web Mercator for area calculations
+        data["area_ha"] = data_proj.geometry.area / 10_000
+    else:
+        data["area_ha"] = data.geometry.area / 10_000
 
     summary_df = (
         data.groupby(class_field)

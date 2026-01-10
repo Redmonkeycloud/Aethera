@@ -240,6 +240,94 @@ with st.sidebar:
     
     st.divider()
     
+    # Show analysis status prominently if a task is running
+    if st.session_state.get("active_task_id"):
+        task_id = st.session_state.active_task_id
+        st.subheader("🔴 Analysis in Progress")
+        
+        try:
+            task_status = tasks_api.get_status(task_id)
+            status = task_status.get("status", "unknown")
+            
+            # Status indicators
+            status_icons = {
+                "PENDING": "⏳",
+                "PROCESSING": "🔄",
+                "COMPLETED": "✅",
+                "FAILED": "❌",
+                "REVOKED": "⚠️"
+            }
+            
+            status_colors = {
+                "PENDING": "blue",
+                "PROCESSING": "orange",
+                "COMPLETED": "green",
+                "FAILED": "red",
+                "REVOKED": "gray"
+            }
+            
+            icon = status_icons.get(status, "❓")
+            color = status_colors.get(status, "blue")
+            
+            # Display status prominently
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"### {icon} Status: **{status}**")
+                st.markdown(f"**Task ID:** `{task_id[:16]}...`")
+                if task_status.get("run_id"):
+                    st.markdown(f"**Run ID:** `{task_status.get('run_id')}`")
+            
+            with col2:
+                if status == "PENDING":
+                    st.info("Waiting to start...")
+                elif status == "PROCESSING":
+                    st.warning("Processing...")
+                    # Show progress if available
+                    progress = task_status.get("progress")
+                    if progress:
+                        if isinstance(progress, dict):
+                            if "message" in progress:
+                                st.caption(f"📝 {progress['message']}")
+                elif status == "COMPLETED":
+                    st.success("Completed!")
+                    run_id = task_status.get("run_id")
+                    if run_id and st.button("View Results", use_container_width=True):
+                        st.session_state.active_task_id = None
+                        st.session_state.selected_run_id = run_id
+                        st.switch_page("pages/4_📈_Run.py")
+                elif status == "FAILED":
+                    st.error("Failed")
+                    error = task_status.get("error", "Unknown error")
+                    with st.expander("Error Details"):
+                        st.code(error[:500] if len(str(error)) > 500 else str(error))
+            
+            # Show progress details
+            progress = task_status.get("progress")
+            if progress and status == "PROCESSING":
+                with st.expander("📊 Progress Details", expanded=True):
+                    if isinstance(progress, dict):
+                        for key, value in progress.items():
+                            st.text(f"{key}: {value}")
+                    else:
+                        st.json(progress)
+            
+            # Clear task ID when completed/failed
+            if status in ["COMPLETED", "FAILED", "REVOKED"]:
+                st.session_state.active_task_id = None
+                if status == "COMPLETED":
+                    st.balloons()
+            else:
+                # Continue polling - use a longer delay to reduce API calls
+                import time
+                time.sleep(5)  # Poll every 5 seconds instead of 2
+                st.rerun()
+                
+        except APIError as e:
+            st.error(f"❌ Failed to get task status: {str(e)}")
+            st.info("The analysis may still be running. Check the 'Runs' tab.")
+        
+        st.divider()
+    
     # Create Analysis Run
     st.subheader("Create Analysis Run")
     
@@ -269,7 +357,7 @@ with st.sidebar:
                 st.error("❌ Please define an AOI first (upload file or enter coordinates)")
             else:
                 try:
-                    with st.spinner("Creating analysis run... This may take a moment."):
+                    with st.spinner("🚀 Starting analysis... This may take a moment."):
                         response = runs_api.create(
                             project_id=project_id,
                             aoi_geojson=st.session_state.aoi_geojson,
@@ -282,8 +370,7 @@ with st.sidebar:
                         if task_id:
                             st.session_state.active_task_id = task_id
                             st.session_state.active_run_id = run_id
-                            st.success(f"✅ Analysis run started! Task ID: {task_id[:8]}...")
-                            st.info("📊 Check the 'Runs' tab to monitor progress")
+                            st.success(f"✅ Analysis started! Monitoring progress...")
                             st.rerun()
                         else:
                             st.error("Failed to get task ID from response")
@@ -309,7 +396,7 @@ with tab1:
     # Layer visibility toggles
     col1, col2, col3 = st.columns(3)
     with col1:
-        show_natura = st.checkbox("Show Natura 2000", value=True)
+        show_natura = st.checkbox("Show Natura 2000", value=False)
     with col2:
         show_corine = st.checkbox("Show CORINE", value=False, help="⚠️ CORINE dataset is very large. Vector tiles are available via API but require a JavaScript-based map. GeoJSON mode will be used (may be slow).")
     with col3:
@@ -463,39 +550,6 @@ with tab1:
     else:
         st.info("Upload or define an AOI, or enable base layers to see the map")
     
-    # Task status polling
-    if st.session_state.get("active_task_id"):
-        st.divider()
-        st.subheader("Analysis Status")
-        task_id = st.session_state.active_task_id
-        
-        try:
-            task_status = tasks_api.get_status(task_id)
-            status = task_status.get("status", "unknown")
-            
-            if status == "PENDING":
-                st.info("⏳ Analysis pending...")
-            elif status == "PROGRESS":
-                st.info("🔄 Analysis in progress...")
-                if "progress" in task_status:
-                    st.json(task_status["progress"])
-            elif status == "SUCCESS":
-                run_id = task_status.get("run_id")
-                if run_id:
-                    st.success("✅ Analysis completed!")
-                    if st.button("View Results"):
-                        st.session_state.selected_run_id = run_id
-                        st.switch_page("pages/4_📈_Run.py")
-                else:
-                    st.warning("Analysis completed but no run ID returned")
-            elif status == "FAILURE":
-                error = task_status.get("error", "Unknown error")
-                st.error(f"❌ Analysis failed: {error}")
-            
-            if status in ["PENDING", "PROGRESS"]:
-                st.rerun()
-        except APIError as e:
-            st.error(f"Failed to get task status: {str(e)}")
 
 with tab2:
     st.subheader("Analysis Runs")

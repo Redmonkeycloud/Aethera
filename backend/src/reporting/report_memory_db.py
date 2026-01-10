@@ -61,26 +61,51 @@ class DatabaseReportMemoryStore:
 
         with self.db_client.connection() as conn:
             with conn.cursor() as cur:
-                # Insert into reports_history
-                cur.execute(
-                    """
-                    INSERT INTO reports_history (
-                        id, project_id, run_id, version, status, summary, storage_path, metadata, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        report_id,
-                        entry.project_id,
-                        entry.run_id,
-                        entry.version,
-                        entry.status,
-                        entry.summary,
-                        str(entry.file_path) if entry.file_path else "",
-                        Jsonb({}),
-                        entry.created_at,
-                        entry.updated_at,
-                    ),
-                )
+                # Insert into reports_history (metadata column may not exist in all schemas)
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO reports_history (
+                            id, project_id, run_id, version, status, summary, storage_path, metadata, created_at, updated_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            report_id,
+                            entry.project_id,
+                            entry.run_id,
+                            entry.version,
+                            entry.status,
+                            entry.summary,
+                            str(entry.file_path) if entry.file_path else "",
+                            Jsonb({}),
+                            entry.created_at,
+                            entry.updated_at,
+                        ),
+                    )
+                except Exception as e:
+                    # Fallback: try without metadata column
+                    if "metadata" in str(e).lower() or "column" in str(e).lower():
+                        logger.warning("metadata column not found, inserting without it")
+                        cur.execute(
+                            """
+                            INSERT INTO reports_history (
+                                id, project_id, run_id, version, status, summary, storage_path, created_at, updated_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                report_id,
+                                entry.project_id,
+                                entry.run_id,
+                                entry.version,
+                                entry.status,
+                                entry.summary,
+                                str(entry.file_path) if entry.file_path else "",
+                                entry.created_at,
+                                entry.updated_at,
+                            ),
+                        )
+                    else:
+                        raise
 
                 # Generate embeddings for sections
                 if sections:

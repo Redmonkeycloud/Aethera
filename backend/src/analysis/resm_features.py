@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import geopandas as gpd
 
 from .kpis import EnvironmentalKPIs
+from .weather_features import extract_weather_features
 
 
 def build_resm_features(
@@ -13,6 +16,9 @@ def build_resm_features(
     environmental_kpis: EnvironmentalKPIs,
     receptor_distances: dict,
     project_type: str,
+    solar_raster_path: Path | None = None,
+    wind_raster_path: Path | None = None,
+    weather_summary_path: Path | None = None,
 ) -> dict[str, float]:
     """
     Build features for Renewable/Resilience Suitability Model.
@@ -101,6 +107,15 @@ def build_resm_features(
             1.0 if project_type not in ("solar_farm", "wind_farm") else 0.0
         ),
     }
+    
+    # Add weather features if available
+    weather_features = extract_weather_features(
+        aoi=aoi,
+        solar_raster_path=solar_raster_path,
+        wind_raster_path=wind_raster_path,
+        weather_summary_path=weather_summary_path,
+    )
+    features.update(weather_features)
 
     return features
 

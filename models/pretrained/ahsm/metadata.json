@@ -1,0 +1,21 @@
+{
+  "dataset_source": "D:\\AETHERA_2.0\\data2\\ahsm\\training.parquet",
+  "n_features": 13,
+  "n_models": 3,
+  "model_name": "ahsm",
+  "vector_fields": [
+    "aoi_area_ha",
+    "forest_ratio",
+    "water_ratio",
+    "impervious_ratio",
+    "agricultural_ratio",
+    "habitat_fragmentation_index",
+    "edge_density",
+    "patch_density",
+    "water_regulation_capacity",
+    "soil_erosion_risk",
+    "distance_to_water_km",
+    "ecosystem_service_value",
+    "connectivity_index"
+  ]
+}

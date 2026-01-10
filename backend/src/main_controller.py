@@ -16,6 +16,13 @@ from .analysis.receptors import calculate_distance_to_receptors
 from .analysis.kpis import calculate_comprehensive_kpis
 from .analysis.resm_features import build_resm_features
 from .analysis.ahsm_features import build_ahsm_features
+from .analysis.model_explainability import (
+    generate_biodiversity_explainability,
+    generate_resm_explainability,
+    generate_ahsm_explainability,
+    generate_cim_explainability,
+)
+from .analysis.explainability import save_explainability_artifacts
 from .config.base_settings import settings
 from .legal import LegalEvaluator, LegalEvaluationResult
 from .legal.loader import LegalRulesLoader
@@ -133,6 +140,29 @@ def main() -> None:
     biodiversity_model = BiodiversityModel(config=biodiversity_config)
     biodiversity_prediction = biodiversity_model.predict(features)
     gis.save_summary([biodiversity_prediction], "biodiversity/prediction.json")
+    
+    # Generate explainability artifacts for biodiversity model
+    try:
+        logger.info("Generating explainability artifacts for biodiversity model...")
+        explainability_dir = run_dir / settings.processed_dir_name / "explainability"
+        explainability_dir.mkdir(parents=True, exist_ok=True)
+        biodiversity_artifacts = generate_biodiversity_explainability(
+            config_path=str(training_data_path) if training_data_path else None,
+            output_dir=explainability_dir,
+        )
+        if biodiversity_artifacts:
+            from .analysis.explainability import _get_cache_key
+            cache_key = _get_cache_key("biodiversity", str(training_data_path) if training_data_path else None, biodiversity_config.version)
+            save_explainability_artifacts(
+                artifacts=biodiversity_artifacts,
+                output_dir=explainability_dir,
+                model_name="biodiversity",
+                use_cache=True,
+                cache_key=cache_key,
+            )
+            logger.info("Biodiversity explainability artifacts generated successfully")
+    except Exception as exc:
+        logger.warning("Failed to generate biodiversity explainability artifacts: %s", exc)
 
     sensitivity_layer = aoi.copy()
     sensitivity_layer["biodiversity_score"] = biodiversity_prediction["score"]
@@ -189,7 +219,7 @@ def main() -> None:
         ),
     }
     emission_result = emission_calculator.compute(land_cover_summary, project_params)
-    gis.save_summary([emission_result.as_dict()], "emissions_summary.json")
+    gis.save_summary([emission_result.as_dict()], "emissions/emission_summary.json")
 
     # Distance-to-receptor calculations
     logger.info("Calculating distances to sensitive receptors...")
@@ -252,17 +282,51 @@ def main() -> None:
 
     # RESM (Renewable/Resilience Suitability Model)
     logger.info("Running RESM (Renewable/Resilience Suitability Model)...")
+    
+    # Get weather data paths if available
+    solar_raster_path = catalog.weather_solar_ghi()
+    wind_raster_path = catalog.weather_wind_speed(height=100)
+    weather_summary_path = catalog.weather_summary()
+    
     resm_features = build_resm_features(
         aoi=aoi,
         land_cover_summary=land_cover_summary,
         environmental_kpis=environmental_kpis,
         receptor_distances=receptor_summary,
         project_type=args.project_type,
+        solar_raster_path=solar_raster_path,
+        wind_raster_path=wind_raster_path,
+        weather_summary_path=weather_summary_path,
     )
-    resm_config = RESMConfig()
+    resm_training_data_path = catalog.resm_training()
+    resm_config = RESMConfig(training_data_path=str(resm_training_data_path) if resm_training_data_path else None)
     resm_model = RESMModel(config=resm_config)
     resm_prediction = resm_model.predict(resm_features)
-    gis.save_summary([resm_prediction], "resm_prediction.json")
+    gis.save_summary([resm_prediction], "predictions/resm_prediction.json")
+    
+    # Generate explainability artifacts for RESM
+    try:
+        logger.info("Generating explainability artifacts for RESM...")
+        explainability_dir = run_dir / settings.processed_dir_name / "explainability"
+        explainability_dir.mkdir(parents=True, exist_ok=True)
+        resm_artifacts = generate_resm_explainability(
+            config_path=None,  # RESM uses synthetic data by default
+            output_dir=explainability_dir,
+            use_cache=True,
+        )
+        if resm_artifacts:
+            from .analysis.explainability import _get_cache_key
+            cache_key = _get_cache_key("resm", None, resm_config.version)
+            save_explainability_artifacts(
+                artifacts=resm_artifacts,
+                output_dir=explainability_dir,
+                model_name="resm",
+                use_cache=True,
+                cache_key=cache_key,
+            )
+            logger.info("RESM explainability artifacts generated successfully")
+    except Exception as exc:
+        logger.warning("Failed to generate RESM explainability artifacts: %s", exc)
 
     # AHSM (Asset Hazard Susceptibility Model)
     logger.info("Running AHSM (Asset Hazard Susceptibility Model)...")
@@ -272,10 +336,35 @@ def main() -> None:
         environmental_kpis=environmental_kpis,
         receptor_distances=receptor_summary,
     )
-    ahsm_config = AHSMConfig()
+    ahsm_training_data_path = catalog.ahsm_training()
+    ahsm_config = AHSMConfig(training_data_path=str(ahsm_training_data_path) if ahsm_training_data_path else None)
     ahsm_model = AHSMModel(config=ahsm_config)
     ahsm_prediction = ahsm_model.predict(ahsm_features)
-    gis.save_summary([ahsm_prediction], "ahsm_prediction.json")
+    gis.save_summary([ahsm_prediction], "predictions/ahsm_prediction.json")
+    
+    # Generate explainability artifacts for AHSM
+    try:
+        logger.info("Generating explainability artifacts for AHSM...")
+        explainability_dir = run_dir / settings.processed_dir_name / "explainability"
+        explainability_dir.mkdir(parents=True, exist_ok=True)
+        ahsm_artifacts = generate_ahsm_explainability(
+            config_path=None,
+            output_dir=explainability_dir,
+            use_cache=True,
+        )
+        if ahsm_artifacts:
+            from .analysis.explainability import _get_cache_key
+            cache_key = _get_cache_key("ahsm", None, ahsm_config.version)
+            save_explainability_artifacts(
+                artifacts=ahsm_artifacts,
+                output_dir=explainability_dir,
+                model_name="ahsm",
+                use_cache=True,
+                cache_key=cache_key,
+            )
+            logger.info("AHSM explainability artifacts generated successfully")
+    except Exception as exc:
+        logger.warning("Failed to generate AHSM explainability artifacts: %s", exc)
 
     # CIM (Cumulative Impact Model) - integrates all models
     logger.info("Running CIM (Cumulative Impact Model)...")
@@ -299,10 +388,35 @@ def main() -> None:
         "soil_erosion_risk": environmental_kpis.soil_erosion_risk,
         "water_regulation_capacity": environmental_kpis.water_regulation_capacity,
     }
-    cim_config = CIMConfig()
+    cim_training_data_path = catalog.cim_training()
+    cim_config = CIMConfig(training_data_path=str(cim_training_data_path) if cim_training_data_path else None)
     cim_model = CIMModel(config=cim_config)
     cim_prediction = cim_model.predict(cim_features)
-    gis.save_summary([cim_prediction], "cim_prediction.json")
+    gis.save_summary([cim_prediction], "predictions/cim_prediction.json")
+    
+    # Generate explainability artifacts for CIM
+    try:
+        logger.info("Generating explainability artifacts for CIM...")
+        explainability_dir = run_dir / settings.processed_dir_name / "explainability"
+        explainability_dir.mkdir(parents=True, exist_ok=True)
+        cim_artifacts = generate_cim_explainability(
+            config_path=None,
+            output_dir=explainability_dir,
+            use_cache=True,
+        )
+        if cim_artifacts:
+            from .analysis.explainability import _get_cache_key
+            cache_key = _get_cache_key("cim", None, cim_config.version)
+            save_explainability_artifacts(
+                artifacts=cim_artifacts,
+                output_dir=explainability_dir,
+                model_name="cim",
+                use_cache=True,
+                cache_key=cache_key,
+            )
+            logger.info("CIM explainability artifacts generated successfully")
+    except Exception as exc:
+        logger.warning("Failed to generate CIM explainability artifacts: %s", exc)
 
     # Log model metadata to database
     try:

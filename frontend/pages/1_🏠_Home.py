@@ -66,17 +66,26 @@ if st.session_state.projects is not None:
             with confirm_col1:
                 if st.button("✅ Confirm Delete", key="confirm_delete", use_container_width=True):
                     try:
-                        projects_api.delete(delete_id)
-                        st.success(f"✅ Project '{delete_name}' deleted successfully")
-                        # Clear session state and reload projects
+                        # Clear session state first to prevent multiple delete attempts
                         st.session_state.delete_project_id = None
                         st.session_state.delete_project_name = None
+                        projects_api.delete(delete_id)
+                        st.success(f"✅ Project '{delete_name}' deleted successfully")
+                        # Reload projects
                         st.session_state.projects = None
                         st.rerun()
                     except APIError as e:
-                        st.error(f"❌ Failed to delete project: {str(e)}")
-                        st.session_state.delete_project_id = None
-                        st.session_state.delete_project_name = None
+                        # Handle 404 gracefully (project already deleted - idempotent)
+                        error_str = str(e)
+                        if "404" in error_str or "not found" in error_str.lower():
+                            st.success(f"✅ Project '{delete_name}' deleted successfully (was already deleted)")
+                            st.session_state.projects = None
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Failed to delete project: {error_str}")
+                            # Restore session state only on real errors
+                            st.session_state.delete_project_id = delete_id
+                            st.session_state.delete_project_name = delete_name
             with confirm_col2:
                 if st.button("❌ Cancel", key="cancel_delete", use_container_width=True):
                     st.session_state.delete_project_id = None
