@@ -26,10 +26,8 @@ def optimize_biodiversity(n_trials: int = 100, timeout: int | None = None):
     logger.info("Optimizing Biodiversity Model Hyperparameters")
     logger.info("=" * 80)
     
-    model = BiodiversityEnsemble()
-    
-    # Generate training data
-    X, y = model._generate_training_data(n=1000)
+    # Generate training data (static method, no need to instantiate)
+    X, y = BiodiversityEnsemble._generate_training_data(n=1000)
     
     logger.info(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
     logger.info(f"Classes: {len(np.unique(y))}")
@@ -75,10 +73,8 @@ def optimize_resm(n_trials: int = 100, timeout: int | None = None):
     logger.info("Optimizing RESM Model Hyperparameters")
     logger.info("=" * 80)
     
-    model = RESMEnsemble()
-    
-    # Generate training data
-    X, y = model._generate_training_data(n=1000)
+    # Generate training data (static method, no need to instantiate)
+    X, y = RESMEnsemble._generate_training_data(n=1000)
     
     logger.info(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
     
@@ -123,10 +119,8 @@ def optimize_ahsm(n_trials: int = 100, timeout: int | None = None):
     logger.info("Optimizing AHSM Model Hyperparameters")
     logger.info("=" * 80)
     
-    model = AHSMEnsemble()
-    
-    # Generate training data
-    X, y = model._generate_training_data(n=1000)
+    # Generate training data (static method, no need to instantiate)
+    X, y = AHSMEnsemble._generate_training_data(n=1000)
     
     logger.info(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
     logger.info(f"Classes: {len(np.unique(y))}")
@@ -172,10 +166,8 @@ def optimize_cim(n_trials: int = 100, timeout: int | None = None):
     logger.info("Optimizing CIM Model Hyperparameters")
     logger.info("=" * 80)
     
-    model = CIMEnsemble()
-    
-    # Generate training data
-    X, y = model._generate_training_data(n=1000)
+    # Generate training data (static method, no need to instantiate)
+    X, y = CIMEnsemble._generate_training_data(n=1000)
     
     logger.info(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
     logger.info(f"Classes: {len(np.unique(y))}")
