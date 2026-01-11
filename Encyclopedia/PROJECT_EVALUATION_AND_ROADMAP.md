@@ -1,7 +1,7 @@
 # AETHERA 2.0 - Comprehensive Project Evaluation & Roadmap
 
-**Last Updated**: 2025-01-10  
-**Document Version**: 1.2
+**Last Updated**: 2026-01-10  
+**Document Version**: 1.3
 
 ---
 
@@ -63,20 +63,18 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 
 ### ⚠️ **Areas for Improvement**
 
-#### 1. **Metrics & Evaluation** ⚠️
+#### 1. **Metrics & Evaluation** ✅
 **Current State:**
 - ✅ Basic metrics: Accuracy, R², MSE, RMSE, MAE
 - ✅ Per-class precision/recall/F1 (classification)
-- ✅ Macro/weighted averages calculated but not prominently displayed
-
-**Missing/Needs Enhancement:**
-- ❌ F1 score not prominently displayed in UI
-- ❌ Confusion matrices not visualized in frontend
-- ❌ ROC curves not displayed
-- ❌ Additional regression metrics (MAPE, Median Absolute Error)
-- ❌ Cross-validation metrics not implemented
-- ❌ Per-class metrics visualization missing
-- ❌ Historical metric tracking not implemented
+- ✅ Macro/weighted averages calculated and prominently displayed
+- ✅ F1 score prominently displayed in UI (NEW - 2026-01-10)
+- ✅ Confusion matrices visualized in frontend with interactive heatmaps (NEW - 2026-01-10)
+- ✅ ROC curves displayed via explainability plots (NEW - 2026-01-10)
+- ✅ Additional regression metrics (MAPE, Median Absolute Error, Adjusted R²) (NEW - 2026-01-10)
+- ✅ Cross-validation metrics implemented (NEW - 2026-01-10)
+- ✅ Per-class metrics visualization with bar charts (NEW - 2026-01-10)
+- ✅ Historical metric tracking implemented with API endpoints (NEW - 2026-01-10)
 
 #### 2. **Data Utilization** ⚠️
 **Current State:**
@@ -172,7 +170,49 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 
 ## 🗺️ Roadmap for Future Improvements
 
-### **Recently Completed (2025-01-10)**
+### **Recently Completed (2026-01-10)**
+
+#### ✅ Comprehensive Metrics Enhancement
+- **Status**: ✅ COMPLETE
+- **Implementation**: Enhanced metrics calculation, API endpoints, and frontend visualization
+- **Features**:
+  - **Enhanced Metrics Calculation** (`ai/training/base.py`):
+    - Added MAPE (Mean Absolute Percentage Error) for regression
+    - Added Median Absolute Error for robust regression evaluation
+    - Added Adjusted R² for regression models
+    - Enhanced F1 score calculation with prominent display keys
+    - Added confusion matrix to classification metrics
+    - Added ROC AUC for binary classification
+    - Implemented `evaluate_with_cross_validation()` method with configurable folds
+  - **New API Endpoints** (`backend/src/api/routes/runs.py`):
+    - `GET /runs/{run_id}/metrics` - Get all model metrics for a run
+    - `GET /runs/{run_id}/metrics/{model_name}` - Get metrics for a specific model
+    - `GET /runs/metrics/history` - Get historical metrics across runs
+  - **Metrics Visualization Tab** (`frontend/pages/4_📈_Run.py`):
+    - New "📊 Model Metrics" tab with comprehensive visualization
+    - **F1 Score Prominently Displayed**: Large metric card with quality indicators
+    - **Confusion Matrix Visualization**: Interactive Plotly heatmaps with table view
+    - **ROC Curve Display**: Integrated with explainability plots
+    - **Per-Class Metrics**: Interactive bar charts showing F1, Precision, Recall per class
+    - **Additional Regression Metrics**: MAPE, Median Absolute Error, Adjusted R²
+    - **Cross-Validation Metrics**: Mean, Std, Min, Max with visualizations
+    - **Historical Metrics Tracking**: Line charts showing F1 trends over time
+    - Raw metrics JSON expandable view
+- **Database Enhancements**:
+  - Added indexes on `model_runs` table for faster queries
+  - Historical metrics storage and retrieval optimized
+- **API Client Updates** (`frontend/src/api_client.py`):
+  - Added `get_metrics()` method
+  - Added `get_model_metrics()` method
+  - Added `get_metrics_history()` method
+- **Benefits**:
+  - Comprehensive model evaluation with all standard metrics
+  - Interactive visualizations for better understanding
+  - Historical tracking for model performance monitoring
+  - Prominent F1 score display for quick assessment
+  - Per-class breakdown for detailed analysis
+  - Cross-validation metrics for robust evaluation
+  - Easy comparison across runs and models
 
 #### ✅ Comprehensive Test Suite Implementation
 - **Status**: ✅ COMPLETE
@@ -344,32 +384,42 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 
 #### 2. ✅ Improve Metrics (User Request)
 
+**Status**: ✅ COMPLETE (2026-01-10)
+
 **Objectives:**
 - Add comprehensive metrics (F1, Recall, MSE, RMSE, etc.)
 - Visualize metrics in frontend
 - Track metrics over time
 
-**Tasks:**
-- **Expand Metrics Collection:**
-  - **Classification**: F1 (macro/weighted), Precision, Recall, Confusion Matrix, ROC-AUC, PR-AUC, Cohen's Kappa, Classification Report
-  - **Regression**: MSE, RMSE, MAE, MAPE, R², Adjusted R², Median Absolute Error
+**Completed Tasks:**
+- ✅ **Expanded Metrics Collection:**
+  - ✅ **Classification**: F1 (macro/weighted) prominently displayed, Precision, Recall, Confusion Matrix, ROC-AUC
+  - ✅ **Regression**: MSE, RMSE, MAE, MAPE, R², Adjusted R², Median Absolute Error
   
-- **Metrics Visualization:**
-  - Confusion matrices in UI
-  - ROC curves and PR curves
-  - Learning curves
-  - Metrics dashboards per model
-  - Historical metric tracking
+- ✅ **Metrics Visualization:**
+  - ✅ Confusion matrices in UI (interactive Plotly heatmaps)
+  - ✅ ROC curves displayed via explainability plots
+  - ✅ Metrics dashboards per model (new "📊 Model Metrics" tab)
+  - ✅ Historical metric tracking (line charts showing trends)
   
-- **Cross-Validation:**
-  - K-fold cross-validation metrics
-  - Stratified CV for classification
-  - Time-series CV for temporal data
+- ✅ **Cross-Validation:**
+  - ✅ K-fold cross-validation metrics implemented
+  - ✅ Stratified CV for classification
+  - ✅ Cross-validation results displayed in UI
 
-**Expected Outcomes:**
-- Comprehensive model evaluation
-- Better model comparison capabilities
-- Improved model selection decisions
+**Outcomes Achieved:**
+- ✅ Comprehensive model evaluation with all standard metrics
+- ✅ Interactive visualizations for better understanding
+- ✅ Historical tracking for model performance monitoring
+- ✅ Prominent F1 score display for quick assessment
+- ✅ Per-class breakdown for detailed analysis
+- ✅ API endpoints for programmatic access to metrics
+
+**Remaining Opportunities:**
+- ⚠️ PR-AUC (Precision-Recall AUC) not yet implemented
+- ⚠️ Cohen's Kappa not yet implemented
+- ⚠️ Learning curves visualization not yet implemented
+- ⚠️ Time-series CV for temporal data (pending TimesFM integration)
 
 ---
 
@@ -741,7 +791,7 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 
 ## 📊 Recommended Implementation Timeline
 
-### **Q1 2025 (Next 3 months) - IMMEDIATE NEXT STEPS**
+### **Q1 2026 (Next 3 months) - IMMEDIATE NEXT STEPS**
 
 #### **Week 1-2: TimesFM Integration (HIGHEST PRIORITY)**
 1. **Historical Weather Data Integration**
@@ -762,12 +812,12 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
    - Display climate risk projections (risk over time)
    - Integrate LangChain for narrative explanations
 
-#### **Week 3-4: Metrics Enhancement**
-- Add F1 score prominently in UI (classification models)
-- Visualize confusion matrices in frontend (Yellowbrick plots)
-- Display ROC curves and PR curves
-- Add metrics dashboards per model in "Model Explainability" tab
-- Historical metric tracking (database schema)
+#### **Week 3-4: Metrics Enhancement** ✅ COMPLETE (2026-01-10)
+- ✅ Add F1 score prominently in UI (classification models)
+- ✅ Visualize confusion matrices in frontend (interactive Plotly heatmaps)
+- ✅ Display ROC curves via explainability plots
+- ✅ Add metrics dashboards per model in new "📊 Model Metrics" tab
+- ✅ Historical metric tracking (API endpoints and database indexes)
 
 #### **Week 5-6: XGBoost/LightGBM Implementation**
 - Replace placeholder implementations with actual models
@@ -781,21 +831,21 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 - Frontend improvements (real-time updates, better visualizations)
 - Basic security (authentication, API keys)
 
-### **Q2 2025 (Months 4-6)**
+### **Q2 2026 (Months 4-6)**
 - ✅ New model types (Neural Networks, time-series)
 - ✅ Complete data integration (all available datasets)
 - ✅ Backend improvements (rate limiting, monitoring)
 - ✅ Advanced frontend features
 - ✅ Observability (Prometheus, basic dashboards)
 
-### **Q3 2025 (Months 7-9)**
+### **Q3 2026 (Months 7-9)**
 - ✅ Security enhancements (RBAC, audit logs)
 - ✅ Model governance (drift detection, A/B testing)
 - ✅ Performance optimizations
 - ✅ Advanced geospatial features
 - ✅ Mobile responsiveness
 
-### **Q4 2025 (Months 10-12)**
+### **Q4 2026 (Months 10-12)**
 - ✅ Advanced AI/ML features
 - ✅ Enhanced reporting with LLMs
 - ✅ Collaboration features
@@ -874,12 +924,13 @@ AETHERA 2.0 demonstrates a **strong foundation** with comprehensive functionalit
 4. ✅ Long-term vision includes advanced AI and collaboration features
 5. ✅ **TimesFM integration** offers exciting opportunity for temporal forecasting capabilities
 
-**Immediate Next Steps (2025-01-10):**
+**Immediate Next Steps (2026-01-10):**
 1. **Integrate TimesFM** for dynamic performance forecasting (energy yield, climate risks)
-2. **Enhance metrics visualization** (F1 scores, confusion matrices, ROC curves)
+2. ✅ **Enhance metrics visualization** (F1 scores, confusion matrices, ROC curves) - **COMPLETE**
 3. **Implement XGBoost/LightGBM** as robust ensemble alternatives
 4. **Complete weather data integration** (Wind Atlas, ERA5 historical data)
 5. **Expand test coverage** (load testing, edge cases, frontend rendering with Streamlit server)
+6. **Add PR-AUC and Cohen's Kappa** to metrics collection (optional enhancements)
 
 The recommended timeline prioritizes user-requested improvements while building towards a robust, scalable, and secure platform. With focused effort on the Priority 1 items, AETHERA 2.0 will be well-positioned for production deployment and user adoption.
 
