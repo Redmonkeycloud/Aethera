@@ -1,9 +1,18 @@
 """Model modules for RESM, AHSM, and CIM."""
 
-from .resm import RESMModel
-from .ahsm import AHSMModel
-from .cim import CIMModel
-from .biodiversity import BiodiversityModel
+from .resm import RESMModel, RESMEnsemble
+from .ahsm import AHSMModel, AHSMEnsemble
+from .cim import CIMModel, CIMEnsemble
+from .biodiversity import BiodiversityModel, BiodiversityEnsemble
 
-__all__ = ["RESMModel", "AHSMModel", "CIMModel", "BiodiversityModel"]
+__all__ = [
+    "RESMModel",
+    "RESMEnsemble",
+    "AHSMModel",
+    "AHSMEnsemble",
+    "CIMModel",
+    "CIMEnsemble",
+    "BiodiversityModel",
+    "BiodiversityEnsemble",
+]
 
