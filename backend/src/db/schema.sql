@@ -57,3 +57,7 @@ CREATE TABLE IF NOT EXISTS model_runs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Add index for faster queries by run_id and model_name
+CREATE INDEX IF NOT EXISTS idx_model_runs_run_id ON model_runs(run_id);
+CREATE INDEX IF NOT EXISTS idx_model_runs_model_name ON model_runs(model_name);
+CREATE INDEX IF NOT EXISTS idx_model_runs_created_at ON model_runs(created_at);

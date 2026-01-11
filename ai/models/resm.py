@@ -15,6 +15,20 @@ from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    xgb = None  # type: ignore[assignment, misc]
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+    lgb = None  # type: ignore[assignment, misc]
+
 from .pretrained import load_pretrained_bundle
 
 
@@ -206,6 +220,47 @@ class RESMEnsemble:
         )
         gb.fit(X, y)
         models.append(("gradient_boosting", gb))
+
+        # XGBoost (if available)
+        if XGBOOST_AVAILABLE:
+            try:
+                xgb_model = xgb.XGBRegressor(
+                    n_estimators=200,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    objective="reg:squarederror",
+                    random_state=21,
+                    n_jobs=-1,
+                    eval_metric="rmse",
+                )
+                xgb_model.fit(X, y)
+                models.append(("xgboost", xgb_model))
+                logger.info("XGBoost model added to ensemble")
+            except Exception as e:
+                logger.warning(f"Failed to train XGBoost model: {e}")
+        else:
+            logger.debug("XGBoost not available. Install with: pip install xgboost")
+
+        # LightGBM (if available)
+        if LIGHTGBM_AVAILABLE:
+            try:
+                lgb_model = lgb.LGBMRegressor(
+                    n_estimators=200,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    objective="regression",
+                    metric="rmse",
+                    random_state=21,
+                    n_jobs=-1,
+                    verbose=-1,
+                )
+                lgb_model.fit(X, y)
+                models.append(("lightgbm", lgb_model))
+                logger.info("LightGBM model added to ensemble")
+            except Exception as e:
+                logger.warning(f"Failed to train LightGBM model: {e}")
+        else:
+            logger.debug("LightGBM not available. Install with: pip install lightgbm")
 
         return models
 

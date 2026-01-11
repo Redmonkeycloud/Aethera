@@ -14,11 +14,22 @@ import numpy as np
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
+    confusion_matrix,
+    f1_score,
     mean_absolute_error,
     mean_squared_error,
+    precision_score,
     r2_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    KFold,
+    StratifiedKFold,
+    cross_val_score,
+    train_test_split,
+)
 
 try:
     import wandb
@@ -124,24 +135,45 @@ class BaseTrainer:
     def evaluate_regression(
         self, y_true: np.ndarray, y_pred: np.ndarray, prefix: str = ""
     ) -> dict[str, float]:
-        """Calculate regression metrics."""
+        """Calculate regression metrics including MAPE and Median Absolute Error."""
         mse = float(mean_squared_error(y_true, y_pred))
         mae = float(mean_absolute_error(y_true, y_pred))
         r2 = float(r2_score(y_true, y_pred))
         rmse = float(np.sqrt(mse))
+        
+        # Calculate MAPE (Mean Absolute Percentage Error)
+        # Avoid division by zero
+        non_zero_mask = y_true != 0
+        if np.any(non_zero_mask):
+            mape = float(np.mean(np.abs((y_true[non_zero_mask] - y_pred[non_zero_mask]) / y_true[non_zero_mask])) * 100)
+        else:
+            mape = float('inf') if np.any(y_pred != y_true) else 0.0
+        
+        # Calculate Median Absolute Error
+        median_ae = float(np.median(np.abs(y_true - y_pred)))
+        
+        # Calculate Adjusted R²
+        n = len(y_true)
+        if n > 1:
+            adjusted_r2 = 1 - (1 - r2) * (n - 1) / (n - 1 - 1)  # Assuming p=1 feature
+        else:
+            adjusted_r2 = r2
 
         metrics = {
             f"{prefix}mse": mse,
             f"{prefix}mae": mae,
             f"{prefix}rmse": rmse,
             f"{prefix}r2": r2,
+            f"{prefix}adjusted_r2": adjusted_r2,
+            f"{prefix}mape": mape,
+            f"{prefix}median_ae": median_ae,
         }
         return metrics
 
     def evaluate_classification(
         self, y_true: np.ndarray, y_pred: np.ndarray, labels: list[str] | None = None, prefix: str = ""
     ) -> dict[str, float]:
-        """Calculate classification metrics."""
+        """Calculate classification metrics including F1, confusion matrix, and ROC AUC."""
         accuracy = float(accuracy_score(y_true, y_pred))
         # Convert string labels to indices if needed
         label_indices: list[int] | None = None
@@ -151,25 +183,90 @@ class BaseTrainer:
 
         metrics = {f"{prefix}accuracy": accuracy}
 
-        # Add per-class metrics
+        # Add per-class metrics with F1 prominently
         for label, scores in report.items():
             if isinstance(scores, dict) and "precision" in scores:
                 metrics[f"{prefix}{label}_precision"] = float(scores["precision"])
                 metrics[f"{prefix}{label}_recall"] = float(scores["recall"])
-                metrics[f"{prefix}{label}_f1"] = float(scores["f1-score"])
+                f1 = float(scores["f1-score"])
+                metrics[f"{prefix}{label}_f1"] = f1
+                # Also store as "f1" for prominent display
+                if label != "macro avg" and label != "weighted avg":
+                    metrics[f"{prefix}{label}_f1_score"] = f1  # Alternative key for easy lookup
 
-        # Add macro and weighted averages
+        # Add macro and weighted averages with F1 prominently
         if "macro avg" in report:
             metrics[f"{prefix}macro_avg_precision"] = float(report["macro avg"]["precision"])
             metrics[f"{prefix}macro_avg_recall"] = float(report["macro avg"]["recall"])
-            metrics[f"{prefix}macro_avg_f1"] = float(report["macro avg"]["f1-score"])
+            macro_f1 = float(report["macro avg"]["f1-score"])
+            metrics[f"{prefix}macro_avg_f1"] = macro_f1
+            metrics[f"{prefix}macro_f1"] = macro_f1  # Alternative key for easy lookup
 
         if "weighted avg" in report:
             metrics[f"{prefix}weighted_avg_precision"] = float(report["weighted avg"]["precision"])
             metrics[f"{prefix}weighted_avg_recall"] = float(report["weighted avg"]["recall"])
-            metrics[f"{prefix}weighted_avg_f1"] = float(report["weighted avg"]["f1-score"])
+            weighted_f1 = float(report["weighted avg"]["f1-score"])
+            metrics[f"{prefix}weighted_avg_f1"] = weighted_f1
+            metrics[f"{prefix}weighted_f1"] = weighted_f1  # Alternative key for easy lookup
+
+        # Add overall F1 (macro average as primary)
+        metrics[f"{prefix}f1"] = metrics.get(f"{prefix}macro_avg_f1", metrics.get(f"{prefix}weighted_avg_f1", 0.0))
+        
+        # Add confusion matrix
+        cm = confusion_matrix(y_true, y_pred, labels=label_indices)
+        metrics[f"{prefix}confusion_matrix"] = cm.tolist()
+        
+        # Add ROC AUC for binary classification (if only 2 classes)
+        unique_classes = np.unique(y_true)
+        if len(unique_classes) == 2:
+            try:
+                # For binary classification, use the positive class
+                roc_auc = float(roc_auc_score(y_true, y_pred))
+                metrics[f"{prefix}roc_auc"] = roc_auc
+            except Exception:
+                pass  # ROC AUC may fail if classes are not properly encoded
+        
+        # Add F1 score prominently (macro average)
+        metrics[f"{prefix}f1_score"] = metrics[f"{prefix}f1"]
 
         return metrics
+    
+    def evaluate_with_cross_validation(
+        self,
+        model: Any,
+        X: np.ndarray,
+        y: np.ndarray,
+        cv_folds: int = 5,
+        scoring: str = "f1_weighted",
+        model_type: str = "classification",
+    ) -> dict[str, float]:
+        """Perform cross-validation and return metrics."""
+        if model_type == "classification":
+            cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=self.config.random_state)
+            # For classification, use f1_macro or f1_weighted
+            if scoring == "f1":
+                scoring = "f1_macro"
+        else:
+            cv = KFold(n_splits=cv_folds, shuffle=True, random_state=self.config.random_state)
+            # For regression, use r2 or neg_mean_squared_error
+            if scoring == "f1":
+                scoring = "r2"
+        
+        try:
+            scores = cross_val_score(model, X, y, cv=cv, scoring=scoring, n_jobs=-1)
+            
+            cv_metrics = {
+                "cv_mean": float(np.mean(scores)),
+                "cv_std": float(np.std(scores)),
+                "cv_min": float(np.min(scores)),
+                "cv_max": float(np.max(scores)),
+                "cv_folds": cv_folds,
+                "cv_scoring": scoring,
+            }
+            return cv_metrics
+        except Exception as e:
+            logger.warning(f"Cross-validation failed: {e}")
+            return {}
 
     def save_model(self, model: Any, model_name: str, metadata: dict[str, Any] | None = None) -> Path:
         """Save model to disk and log to MLflow/W&B."""

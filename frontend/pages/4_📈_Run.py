@@ -63,7 +63,7 @@ except APIError:
     pass  # Legal data is optional
 
 # Tabs for different views
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Results", "Visualizations", "Legal Compliance", "Map", "Report", "Model Explainability"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Results", "Visualizations", "Legal Compliance", "Map", "Report", "Model Explainability", "📊 Model Metrics"])
 
 with tab1:
     st.subheader("Analysis Results")
@@ -833,4 +833,333 @@ with tab6:
     
     These visualizations help understand model behavior and build trust in AI predictions.
     **Note:** Explainability artifacts are automatically generated during analysis and cached for faster access.
+    """)
+
+with tab7:
+    st.subheader("📊 Model Metrics")
+    st.write("Comprehensive performance metrics for all ML models used in this analysis.")
+    
+    # Load metrics
+    metrics_data = None
+    try:
+        with st.spinner("Loading metrics..."):
+            metrics_data = runs_api.get_metrics(run_id)
+    except APIError as e:
+        st.warning(f"⚠️ Could not load metrics: {str(e)}")
+        st.info("💡 Metrics are generated during model training. They may not be available for older runs.")
+    
+    if metrics_data and "metrics_by_model" in metrics_data:
+        metrics_by_model = metrics_data["metrics_by_model"]
+        model_names = list(metrics_by_model.keys())
+        
+        if model_names:
+            selected_model = st.selectbox("Select Model", model_names, key="metrics_model")
+            
+            if selected_model:
+                model_metrics = metrics_by_model[selected_model].get("metrics", {})
+                
+                if model_metrics:
+                    # Display F1 Score Prominently
+                    st.divider()
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    # Try to find F1 score in various keys
+                    f1_score = None
+                    for key in ["f1", "f1_score", "macro_avg_f1", "macro_f1", "weighted_avg_f1", "weighted_f1"]:
+                        if key in model_metrics:
+                            f1_score = model_metrics[key]
+                            break
+                        # Also check for prefixed keys (e.g., "ensemble_test_f1")
+                        for metric_key in model_metrics.keys():
+                            if key in metric_key.lower():
+                                f1_score = model_metrics[metric_key]
+                                break
+                        if f1_score is not None:
+                            break
+                    
+                    if f1_score is not None:
+                        with col1:
+                            st.metric(
+                                "🎯 F1 Score",
+                                f"{f1_score:.4f}",
+                                delta=f"{'Excellent' if f1_score >= 0.8 else 'Good' if f1_score >= 0.6 else 'Fair' if f1_score >= 0.4 else 'Needs Improvement'}"
+                            )
+                    
+                    # Display accuracy
+                    accuracy = model_metrics.get("accuracy") or model_metrics.get("ensemble_test_accuracy")
+                    if accuracy is None:
+                        for key in model_metrics.keys():
+                            if "accuracy" in key.lower():
+                                accuracy = model_metrics[key]
+                                break
+                    
+                    if accuracy is not None:
+                        with col2:
+                            st.metric("Accuracy", f"{accuracy:.4f}")
+                    
+                    # Display R² for regression models
+                    r2 = model_metrics.get("r2") or model_metrics.get("ensemble_test_r2")
+                    if r2 is None:
+                        for key in model_metrics.keys():
+                            if "r2" in key.lower() or "r_squared" in key.lower():
+                                r2 = model_metrics[key]
+                                break
+                    
+                    if r2 is not None:
+                        with col3:
+                            st.metric("R² Score", f"{r2:.4f}")
+                    
+                    # Display RMSE for regression
+                    rmse = model_metrics.get("rmse") or model_metrics.get("ensemble_test_rmse")
+                    if rmse is None:
+                        for key in model_metrics.keys():
+                            if "rmse" in key.lower():
+                                rmse = model_metrics[key]
+                                break
+                    
+                    if rmse is not None:
+                        with col4:
+                            st.metric("RMSE", f"{rmse:.4f}")
+                    
+                    # Additional Regression Metrics
+                    st.divider()
+                    regression_metrics = {}
+                    for key, value in model_metrics.items():
+                        if any(metric in key.lower() for metric in ["mape", "median_ae", "mae", "adjusted_r2"]):
+                            regression_metrics[key.replace("_", " ").title()] = value
+                    
+                    if regression_metrics:
+                        st.write("### Additional Regression Metrics")
+                        cols = st.columns(min(len(regression_metrics), 4))
+                        for idx, (metric_name, metric_value) in enumerate(regression_metrics.items()):
+                            with cols[idx % 4]:
+                                st.metric(metric_name, f"{metric_value:.4f}")
+                    
+                    # Confusion Matrix Visualization
+                    st.divider()
+                    confusion_matrix_key = None
+                    confusion_matrix_data = None
+                    for key in model_metrics.keys():
+                        if "confusion_matrix" in key.lower():
+                            confusion_matrix_key = key
+                            confusion_matrix_data = model_metrics[key]
+                            break
+                    
+                    if confusion_matrix_data:
+                        st.write("### Confusion Matrix")
+                        try:
+                            import numpy as np
+                            import pandas as pd
+                            import plotly.express as px
+                            
+                            cm = np.array(confusion_matrix_data)
+                            
+                            # Create heatmap
+                            fig = px.imshow(
+                                cm,
+                                labels=dict(x="Predicted", y="Actual", color="Count"),
+                                x=[f"Class {i}" for i in range(cm.shape[1])],
+                                y=[f"Class {i}" for i in range(cm.shape[0])],
+                                color_continuous_scale="Blues",
+                                aspect="auto",
+                                title=f"Confusion Matrix - {selected_model.upper()}"
+                            )
+                            fig.update_layout(
+                                width=700,
+                                height=600,
+                                xaxis_title="Predicted Label",
+                                yaxis_title="Actual Label"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Display confusion matrix as table
+                            cm_df = pd.DataFrame(
+                                cm,
+                                index=[f"Actual Class {i}" for i in range(cm.shape[0])],
+                                columns=[f"Predicted Class {i}" for i in range(cm.shape[1])]
+                            )
+                            st.dataframe(cm_df, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error displaying confusion matrix: {e}")
+                            st.json(confusion_matrix_data)
+                    
+                    # ROC Curve (if available in explainability plots)
+                    st.divider()
+                    st.write("### ROC Curve")
+                    try:
+                        explainability_data = runs_api.get_explainability(run_id, selected_model)
+                        if "plots" in explainability_data:
+                            plots = explainability_data["plots"]
+                            roc_plot_path = None
+                            
+                            # Find ROC curve plot
+                            for plot_key, plot_path in plots.items():
+                                if "roc" in plot_key.lower() or "roc_curve" in plot_key.lower():
+                                    roc_plot_path = plot_path
+                                    break
+                            
+                            if roc_plot_path:
+                                plot_url = runs_api.get_explainability_plot_url(run_id, selected_model, roc_plot_path)
+                                st.image(plot_url, caption=f"ROC Curve - {selected_model.upper()}", use_container_width=True)
+                            else:
+                                st.info("💡 ROC curve will be available once explainability artifacts are generated for this model.")
+                    except APIError:
+                        st.info("💡 Generate explainability artifacts to view ROC curves.")
+                    
+                    # Per-Class Metrics
+                    st.divider()
+                    st.write("### Per-Class Metrics")
+                    
+                    per_class_metrics = {}
+                    class_labels = set()
+                    
+                    # Extract per-class metrics
+                    for key, value in model_metrics.items():
+                        # Look for keys like "0_precision", "low_f1", "macro_avg_f1", etc.
+                        if "_precision" in key or "_recall" in key or "_f1" in key:
+                            # Extract class name (everything before the metric name)
+                            parts = key.split("_")
+                            if len(parts) >= 2:
+                                # Check if it's a numeric class or label
+                                if parts[0].isdigit():
+                                    class_name = parts[0]
+                                    metric_name = "_".join(parts[1:])
+                                elif parts[0] in ["macro", "weighted", "micro"]:
+                                    class_name = "_".join(parts[:2])  # e.g., "macro_avg"
+                                    metric_name = "_".join(parts[2:])
+                                else:
+                                    # Could be a label like "low", "medium", "high"
+                                    class_name = parts[0]
+                                    metric_name = "_".join(parts[1:])
+                                
+                                if class_name not in per_class_metrics:
+                                    per_class_metrics[class_name] = {}
+                                per_class_metrics[class_name][metric_name] = value
+                                class_labels.add(class_name)
+                    
+                    if per_class_metrics:
+                        # Create a DataFrame for better visualization
+                        try:
+                            import pandas as pd
+                            
+                            metrics_df = pd.DataFrame(per_class_metrics).T
+                            metrics_df.index.name = "Class"
+                            st.dataframe(metrics_df, use_container_width=True)
+                            
+                            # Visualize per-class F1 scores
+                            f1_scores_per_class = {}
+                            for class_name, metrics in per_class_metrics.items():
+                                for metric_name, value in metrics.items():
+                                    if "f1" in metric_name.lower():
+                                        f1_scores_per_class[class_name] = value
+                            
+                            if f1_scores_per_class:
+                                import plotly.express as px
+                                f1_df = pd.DataFrame(list(f1_scores_per_class.items()), columns=["Class", "F1 Score"])
+                                fig = px.bar(
+                                    f1_df,
+                                    x="Class",
+                                    y="F1 Score",
+                                    title=f"F1 Score by Class - {selected_model.upper()}",
+                                    color="F1 Score",
+                                    color_continuous_scale="Viridis"
+                                )
+                                fig.update_layout(height=400)
+                                st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error displaying per-class metrics: {e}")
+                            st.json(per_class_metrics)
+                    else:
+                        st.info("💡 Per-class metrics will be available after model training.")
+                    
+                    # Cross-Validation Metrics
+                    st.divider()
+                    cv_metrics = {}
+                    for key, value in model_metrics.items():
+                        if "cv_" in key.lower():
+                            cv_metrics[key.replace("_", " ").title()] = value
+                    
+                    if cv_metrics:
+                        st.write("### Cross-Validation Metrics")
+                        cols = st.columns(min(len(cv_metrics), 4))
+                        for idx, (metric_name, metric_value) in enumerate(cv_metrics.items()):
+                            with cols[idx % 4]:
+                                st.metric(metric_name, f"{metric_value:.4f}")
+                    else:
+                        st.write("### Cross-Validation Metrics")
+                        st.info("💡 Cross-validation metrics are generated during model training.")
+                    
+                    # Historical Metrics (if available)
+                    st.divider()
+                    st.write("### Historical Metrics")
+                    try:
+                        history_data = runs_api.get_metrics_history(model_name=selected_model, limit=10)
+                        if history_data and "history" in history_data and history_data["history"]:
+                            st.write(f"Recent performance for {selected_model.upper()} across runs:")
+                            
+                            try:
+                                import pandas as pd
+                                
+                                history_records = []
+                                for record in history_data["history"][:10]:  # Last 10 runs
+                                    metrics = record.get("metrics", {})
+                                    f1 = metrics.get("f1") or metrics.get("f1_score") or metrics.get("macro_avg_f1", 0)
+                                    accuracy = metrics.get("accuracy", 0)
+                                    history_records.append({
+                                        "Run ID": record["run_id"][:8] + "...",
+                                        "F1 Score": f1,
+                                        "Accuracy": accuracy,
+                                        "Created At": record.get("created_at", "N/A")[:10] if record.get("created_at") else "N/A"
+                                    })
+                                
+                                if history_records:
+                                    history_df = pd.DataFrame(history_records)
+                                    st.dataframe(history_df, use_container_width=True)
+                                    
+                                    # Plot historical F1 scores
+                                    if len(history_records) > 1:
+                                        import plotly.express as px
+                                        fig = px.line(
+                                            history_df,
+                                            x="Created At",
+                                            y="F1 Score",
+                                            title=f"Historical F1 Score Trend - {selected_model.upper()}",
+                                            markers=True
+                                        )
+                                        fig.update_layout(height=400)
+                                        st.plotly_chart(fig, use_container_width=True)
+                            except Exception as e:
+                                st.warning(f"Could not display historical metrics: {e}")
+                        else:
+                            st.info("💡 Historical metrics will be available as more runs are completed.")
+                    except APIError:
+                        st.info("💡 Historical metrics tracking requires database access.")
+                    
+                    # Raw metrics JSON (expandable)
+                    with st.expander("📋 View Raw Metrics JSON"):
+                        st.json(model_metrics)
+                else:
+                    st.warning(f"⚠️ No metrics found for {selected_model}.")
+        else:
+            st.warning("⚠️ No metrics available for this run.")
+    else:
+        st.info("💡 Metrics are generated during model training. They may not be available yet.")
+    
+    st.divider()
+    st.write("### About Model Metrics")
+    st.info("""
+    **Performance Metrics** provide insights into model quality:
+    - **F1 Score**: Harmonic mean of precision and recall (0-1, higher is better)
+    - **Accuracy**: Proportion of correct predictions
+    - **R² Score**: Regression model's explained variance (0-1, higher is better)
+    - **RMSE**: Root Mean Squared Error (lower is better for regression)
+    - **MAPE**: Mean Absolute Percentage Error (lower is better)
+    - **Median Absolute Error**: Robust measure of prediction error
+    
+    **Visualizations**:
+    - **Confusion Matrix**: Shows prediction accuracy per class
+    - **ROC Curve**: Receiver Operating Characteristic (for binary classification)
+    - **Per-Class Metrics**: Precision, Recall, F1 for each class
+    
+    **Historical Tracking**: Compare model performance across runs to detect degradation or improvement.
     """)

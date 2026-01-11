@@ -53,7 +53,10 @@ dependencies = [
     "langchain-core>=0.1.0",
     "langchain-community>=0.0.20",
     "langchain-groq>=0.1.0",
-    "langchain-openai>=0.0.5"
+    "langchain-openai>=0.0.5",
+    "xgboost>=2.0.0",
+    "lightgbm>=4.0.0",
+    "optuna>=3.5.0"
 ]
 
 [project.optional-dependencies]

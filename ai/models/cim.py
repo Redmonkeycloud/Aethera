@@ -15,6 +15,20 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    xgb = None  # type: ignore[assignment, misc]
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+    lgb = None  # type: ignore[assignment, misc]
+
 from .pretrained import load_pretrained_bundle
 
 
@@ -224,6 +238,52 @@ class CIMEnsemble:
         )
         gb.fit(X, y)
         models.append(("gradient_boosting", gb))
+
+        # XGBoost (if available)
+        if XGBOOST_AVAILABLE:
+            try:
+                n_classes = len(np.unique(y))
+                xgb_objective = "binary:logistic" if n_classes == 2 else "multi:softprob"
+                xgb_model = xgb.XGBClassifier(
+                    n_estimators=200,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    objective=xgb_objective,
+                    random_state=21,
+                    n_jobs=-1,
+                    eval_metric="mlogloss" if n_classes > 2 else "logloss",
+                )
+                xgb_model.fit(X, y)
+                models.append(("xgboost", xgb_model))
+                logger.info("XGBoost model added to ensemble")
+            except Exception as e:
+                logger.warning(f"Failed to train XGBoost model: {e}")
+        else:
+            logger.debug("XGBoost not available. Install with: pip install xgboost")
+
+        # LightGBM (if available)
+        if LIGHTGBM_AVAILABLE:
+            try:
+                n_classes = len(np.unique(y))
+                lgb_objective = "binary" if n_classes == 2 else "multiclass"
+                lgb_metric = "binary_logloss" if n_classes == 2 else "multi_logloss"
+                lgb_model = lgb.LGBMClassifier(
+                    n_estimators=200,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    objective=lgb_objective,
+                    metric=lgb_metric,
+                    random_state=21,
+                    n_jobs=-1,
+                    verbose=-1,
+                )
+                lgb_model.fit(X, y)
+                models.append(("lightgbm", lgb_model))
+                logger.info("LightGBM model added to ensemble")
+            except Exception as e:
+                logger.warning(f"Failed to train LightGBM model: {e}")
+        else:
+            logger.debug("LightGBM not available. Install with: pip install lightgbm")
 
         return models
 

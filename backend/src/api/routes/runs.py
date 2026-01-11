@@ -650,3 +650,219 @@ async def export_explainability_report(run_id: str, model_name: str) -> FileResp
         logger.error(f"Error exporting explainability report: {e}")
         raise HTTPException(status_code=500, detail=f"Error exporting report: {str(e)}")
 
+
+@router.get("/{run_id}/metrics")
+async def get_run_metrics(run_id: str) -> JSONResponse:
+    """
+    Get all model metrics for a run.
+    
+    Returns metrics for all models used in the run, including:
+    - F1 scores (prominently displayed)
+    - Confusion matrices
+    - ROC curves (for binary classification)
+    - Per-class metrics
+    - Regression metrics (MAPE, Median Absolute Error)
+    - Cross-validation metrics (if available)
+    """
+    run = run_store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # Try to load metrics from database
+    try:
+        from ...db import DatabaseClient, ModelRunLogger
+        from ...config.base_settings import settings as app_settings
+        
+        db_client = DatabaseClient(app_settings.database_url)
+        model_logger = ModelRunLogger(db_client)
+        
+        # Query metrics from database
+        with db_client.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT model_name, metrics, created_at FROM model_runs WHERE run_id = %s ORDER BY created_at DESC",
+                    (run_id,)
+                )
+                rows = cur.fetchall()
+                
+                if rows:
+                    metrics_by_model = {}
+                    for model_name, metrics_json, created_at in rows:
+                        if model_name not in metrics_by_model:
+                            metrics_by_model[model_name] = {
+                                "metrics": metrics_json or {},
+                                "created_at": created_at.isoformat() if created_at else None,
+                            }
+                        else:
+                            # Merge metrics (keep most recent)
+                            metrics_by_model[model_name]["metrics"].update(metrics_json or {})
+                    
+                    return JSONResponse(content={
+                        "run_id": run_id,
+                        "metrics_by_model": metrics_by_model,
+                    })
+    except Exception as e:
+        logger.warning(f"Could not load metrics from database: {e}")
+    
+    # Fallback: Try to load from explainability metadata
+    run_dir = settings.data_dir / run_id / settings.processed_dir_name
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run results not found")
+    
+    metrics_by_model = {}
+    model_names = ["biodiversity", "resm", "ahsm", "cim"]
+    
+    for model_name in model_names:
+        explainability_dir = run_dir / "explainability" / model_name
+        metadata_path = explainability_dir / "explainability_metadata.json"
+        
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, encoding="utf-8") as f:
+                    metadata = json.load(f)
+                    if "metrics" in metadata:
+                        metrics_by_model[model_name] = {
+                            "metrics": metadata["metrics"],
+                            "source": "explainability_metadata",
+                        }
+            except Exception:
+                pass
+    
+    if not metrics_by_model:
+        raise HTTPException(
+            status_code=404,
+            detail="No metrics found for this run. Metrics are generated during analysis."
+        )
+    
+    return JSONResponse(content={
+        "run_id": run_id,
+        "metrics_by_model": metrics_by_model,
+    })
+
+
+@router.get("/{run_id}/metrics/{model_name}")
+async def get_model_metrics(run_id: str, model_name: str) -> JSONResponse:
+    """
+    Get metrics for a specific model in a run.
+    
+    Returns:
+    - F1 score (prominently)
+    - Confusion matrix
+    - ROC curve data (for binary classification)
+    - Per-class metrics
+    - Regression metrics (if applicable)
+    - Cross-validation metrics (if available)
+    """
+    run = run_store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    # Try to load from database first
+    try:
+        from ...db import DatabaseClient, ModelRunLogger
+        from ...config.base_settings import settings as app_settings
+        
+        db_client = DatabaseClient(app_settings.database_url)
+        
+        with db_client.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT metrics, created_at FROM model_runs WHERE run_id = %s AND model_name = %s ORDER BY created_at DESC LIMIT 1",
+                    (run_id, model_name)
+                )
+                row = cur.fetchone()
+                
+                if row and row[0]:
+                    metrics = row[0]
+                    return JSONResponse(content={
+                        "run_id": run_id,
+                        "model_name": model_name,
+                        "metrics": metrics,
+                        "created_at": row[1].isoformat() if row[1] else None,
+                    })
+    except Exception as e:
+        logger.warning(f"Could not load metrics from database: {e}")
+    
+    # Fallback: Try to load from explainability metadata
+    run_dir = settings.data_dir / run_id / settings.processed_dir_name
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run results not found")
+    
+    explainability_dir = run_dir / "explainability" / model_name
+    metadata_path = explainability_dir / "explainability_metadata.json"
+    
+    if not metadata_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Metrics not found for model {model_name} in run {run_id}"
+        )
+    
+    try:
+        with open(metadata_path, encoding="utf-8") as f:
+            metadata = json.load(f)
+            metrics = metadata.get("metrics", {})
+            
+            return JSONResponse(content={
+                "run_id": run_id,
+                "model_name": model_name,
+                "metrics": metrics,
+                "source": "explainability_metadata",
+            })
+    except Exception as e:
+        logger.error(f"Error loading metrics: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading metrics: {str(e)}")
+
+
+@router.get("/{run_id}/metrics/history")
+async def get_metrics_history(
+    run_id: str | None = None,
+    model_name: str | None = None,
+    limit: int = 100,
+) -> JSONResponse:
+    """
+    Get historical metrics across runs.
+    
+    Useful for tracking model performance over time.
+    """
+    try:
+        from ...db import DatabaseClient
+        from ...config.base_settings import settings as app_settings
+        
+        db_client = DatabaseClient(app_settings.database_url)
+        
+        with db_client.connection() as conn:
+            with conn.cursor() as cur:
+                query = "SELECT run_id, model_name, metrics, created_at FROM model_runs WHERE 1=1"
+                params = []
+                
+                if run_id:
+                    query += " AND run_id = %s"
+                    params.append(run_id)
+                
+                if model_name:
+                    query += " AND model_name = %s"
+                    params.append(model_name)
+                
+                query += " ORDER BY created_at DESC LIMIT %s"
+                params.append(limit)
+                
+                cur.execute(query, params)
+                rows = cur.fetchall()
+                
+                history = []
+                for row in rows:
+                    history.append({
+                        "run_id": row[0],
+                        "model_name": row[1],
+                        "metrics": row[2] or {},
+                        "created_at": row[3].isoformat() if row[3] else None,
+                    })
+                
+                return JSONResponse(content={
+                    "history": history,
+                    "count": len(history),
+                })
+    except Exception as e:
+        logger.error(f"Error loading metrics history: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading metrics history: {str(e)}")
+

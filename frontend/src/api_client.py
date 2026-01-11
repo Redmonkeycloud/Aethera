@@ -189,6 +189,26 @@ class RunsAPI:
         response = requests.get(url, timeout=60)
         response.raise_for_status()
         return response.content
+    
+    @staticmethod
+    def get_metrics(run_id: str) -> Dict[str, Any]:
+        """Get all model metrics for a run."""
+        return _make_request("GET", f"/runs/{run_id}/metrics")
+    
+    @staticmethod
+    def get_model_metrics(run_id: str, model_name: str) -> Dict[str, Any]:
+        """Get metrics for a specific model in a run."""
+        return _make_request("GET", f"/runs/{run_id}/metrics/{model_name}")
+    
+    @staticmethod
+    def get_metrics_history(run_id: Optional[str] = None, model_name: Optional[str] = None, limit: int = 100) -> Dict[str, Any]:
+        """Get historical metrics across runs."""
+        params = {"limit": limit}
+        if run_id:
+            params["run_id"] = run_id
+        if model_name:
+            params["model_name"] = model_name
+        return _make_request("GET", "/runs/metrics/history", params=params)
 
 
 class TasksAPI:
