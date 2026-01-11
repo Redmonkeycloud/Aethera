@@ -196,6 +196,38 @@ class RunsAPI:
         return _make_request("GET", f"/runs/{run_id}/metrics")
     
     @staticmethod
+    def get_energy_yield_forecast(
+        self, 
+        run_id: str, 
+        horizon_days: int = 365, 
+        method: str = "auto",
+        variable: str = "solar_radiation"
+    ) -> Dict[str, Any]:
+        """Get energy yield forecast for a run."""
+        return _make_request(
+            "GET",
+            f"/runs/{run_id}/forecasts/energy-yield",
+            params={"horizon_days": horizon_days, "method": method, "variable": variable}
+        )
+    
+    def get_climate_risk_forecast(
+        self, 
+        run_id: str, 
+        risk_type: str = "extreme_heat", 
+        horizon_days: int = 365, 
+        method: str = "auto"
+    ) -> Dict[str, Any]:
+        """Get climate risk forecast for a run."""
+        return _make_request(
+            "GET",
+            f"/runs/{run_id}/forecasts/climate-risk",
+            params={"risk_type": risk_type, "horizon_days": horizon_days, "method": method}
+        )
+    
+    def list_forecasts(self, run_id: str) -> Dict[str, Any]:
+        """List all available forecasts for a run."""
+        return _make_request("GET", f"/runs/{run_id}/forecasts")
+    
     def get_model_metrics(run_id: str, model_name: str) -> Dict[str, Any]:
         """Get metrics for a specific model in a run."""
         return _make_request("GET", f"/runs/{run_id}/metrics/{model_name}")

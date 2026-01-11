@@ -63,7 +63,16 @@ except APIError:
     pass  # Legal data is optional
 
 # Tabs for different views
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Results", "Visualizations", "Legal Compliance", "Map", "Report", "Model Explainability", "📊 Model Metrics"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "Results", 
+    "Visualizations", 
+    "Legal Compliance", 
+    "Map", 
+    "Report", 
+    "Model Explainability", 
+    "📊 Model Metrics",
+    "🔮 Temporal Forecast"
+])
 
 with tab1:
     st.subheader("Analysis Results")
@@ -1163,3 +1172,259 @@ with tab7:
     
     **Historical Tracking**: Compare model performance across runs to detect degradation or improvement.
     """)
+
+# Temporal Forecast Tab
+with tab8:
+    st.header("🔮 Temporal Forecasts")
+    st.markdown("### Future Energy Yield and Climate Risk Projections")
+    
+    # Check for available forecasts
+    try:
+        with st.spinner("Loading available forecasts..."):
+            forecasts_meta = runs_api.list_forecasts(run_id)
+            
+        if forecasts_meta.get("count", 0) == 0:
+            st.info("💡 No temporal data available for this run. Temporal forecasts require historical weather data (ERA5).")
+            st.markdown("""
+            **To enable temporal forecasts:**
+            1. Ensure ERA5 data is downloaded for your AOI region
+            2. Set up Copernicus CDS API credentials (CDS_API_KEY)
+            3. Re-run the analysis with temporal data extraction enabled
+            """)
+        else:
+            # Forecast controls
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                forecast_type = st.selectbox(
+                    "Forecast Type",
+                    ["Energy Yield", "Climate Risk"],
+                    key="forecast_type"
+                )
+            with col2:
+                horizon_days = st.slider(
+                    "Forecast Horizon (days)",
+                    min_value=30,
+                    max_value=1825,  # 5 years
+                    value=365,
+                    step=30,
+                    key="forecast_horizon"
+                )
+            with col3:
+                method = st.selectbox(
+                    "Forecasting Method",
+                    ["auto", "prophet", "arima", "simple_trend"],
+                    key="forecast_method"
+                )
+            
+            if forecast_type == "Energy Yield":
+                st.subheader("📊 Energy Yield Forecast")
+                
+                variable = st.selectbox(
+                    "Energy Source",
+                    ["solar_radiation", "wind_speed"],
+                    key="energy_variable"
+                )
+                
+                if st.button("Generate Forecast", key="generate_energy_forecast"):
+                    try:
+                        with st.spinner("Generating energy yield forecast..."):
+                            forecast_result = runs_api.get_energy_yield_forecast(
+                                run_id=run_id,
+                                horizon_days=horizon_days,
+                                method=method,
+                                variable=variable
+                            )
+                        
+                        # Display metrics
+                        metrics = forecast_result.get("metrics", {})
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Model", metrics.get("model", "N/A").upper())
+                        with col2:
+                            st.metric("MAE", f"{metrics.get('mae', 0):.2f}")
+                        with col3:
+                            st.metric("RMSE", f"{metrics.get('rmse', 0):.2f}")
+                        
+                        # Visualize forecast
+                        import plotly.graph_objects as go
+                        import pandas as pd
+                        
+                        forecast_data = forecast_result.get("forecast_data", {})
+                        timestamps = pd.to_datetime(forecast_data.get("timestamps", []))
+                        forecast_values = forecast_data.get("forecast", [])
+                        lower_bound = forecast_data.get("lower_bound", [])
+                        upper_bound = forecast_data.get("upper_bound", [])
+                        
+                        fig = go.Figure()
+                        
+                        # Forecast with confidence interval
+                        fig.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=forecast_values,
+                            mode='lines',
+                            name='Forecast',
+                            line=dict(color='#1f77b4', width=2)
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=upper_bound,
+                            mode='lines',
+                            name='Upper Bound',
+                            line=dict(width=0),
+                            showlegend=False
+                        ))
+                        fig.add_trace(go.Scatter(
+                            x=timestamps,
+                            y=lower_bound,
+                            mode='lines',
+                            name='Lower Bound',
+                            fill='tonexty',
+                            fillcolor='rgba(31, 119, 180, 0.2)',
+                            line=dict(width=0),
+                        ))
+                        
+                        fig.update_layout(
+                            title=f"{variable.replace('_', ' ').title()} Forecast ({horizon_days} days)",
+                            xaxis_title="Date",
+                            yaxis_title=f"{variable.replace('_', ' ').title()}",
+                            hovermode='x unified',
+                            height=500,
+                            template='plotly_white'
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Narrative explanation
+                        st.subheader("📝 Forecast Explanation")
+                        narrative = f"""
+                        The {variable.replace('_', ' ')} forecast for the next {horizon_days} days shows:
+                        
+                        - **Model**: {metrics.get('model', 'N/A')}
+                        - **Forecast Range**: {min(forecast_values):.2f} - {max(forecast_values):.2f}
+                        - **Average Forecast**: {sum(forecast_values) / len(forecast_values):.2f}
+                        - **Uncertainty**: The shaded region represents the 95% confidence interval
+                        
+                        This forecast can be used to:
+                        - Estimate renewable energy generation potential
+                        - Plan operational schedules
+                        - Assess seasonal variability
+                        """
+                        st.markdown(narrative)
+                        
+                    except APIError as e:
+                        st.error(f"Failed to generate forecast: {str(e)}")
+            
+            elif forecast_type == "Climate Risk":
+                st.subheader("🌡️ Climate Risk Forecast")
+                
+                risk_type = st.selectbox(
+                    "Risk Type",
+                    ["extreme_heat", "extreme_cold", "wind_storm", "drought"],
+                    key="risk_type_select"
+                )
+                
+                if st.button("Generate Forecast", key="generate_risk_forecast"):
+                    try:
+                        with st.spinner("Generating climate risk forecast..."):
+                            forecast_result = runs_api.get_climate_risk_forecast(
+                                run_id=run_id,
+                                risk_type=risk_type,
+                                horizon_days=horizon_days,
+                                method=method
+                            )
+                        
+                        # Display metrics
+                        metrics = forecast_result.get("metrics", {})
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Model", metrics.get("model", "N/A").upper())
+                        with col2:
+                            st.metric("MAE", f"{metrics.get('mae', 0):.2f}")
+                        with col3:
+                            st.metric("RMSE", f"{metrics.get('rmse', 0):.2f}")
+                        
+                        # Visualize forecast
+                        import plotly.graph_objects as go
+                        from plotly.subplots import make_subplots
+                        import pandas as pd
+                        
+                        forecast_data = forecast_result.get("forecast_data", {})
+                        timestamps = pd.to_datetime(forecast_data.get("timestamps", []))
+                        forecast_values = forecast_data.get("forecast", [])
+                        risk_scores = forecast_data.get("risk_scores", [])
+                        risk_levels = forecast_data.get("risk_levels", [])
+                        
+                        # Create subplots
+                        fig = make_subplots(
+                            rows=2, cols=1,
+                            subplot_titles=('Climate Variable Forecast', 'Risk Level Over Time'),
+                            vertical_spacing=0.1,
+                            row_heights=[0.6, 0.4]
+                        )
+                        
+                        # Forecast plot
+                        fig.add_trace(
+                            go.Scatter(
+                                x=timestamps,
+                                y=forecast_values,
+                                mode='lines',
+                                name='Forecast',
+                                line=dict(color='#1f77b4', width=2)
+                            ),
+                            row=1, col=1
+                        )
+                        
+                        # Risk scores plot (color-coded by risk level)
+                        colors = {
+                            'low': 'green',
+                            'moderate': 'yellow',
+                            'high': 'orange',
+                            'extreme': 'red'
+                        }
+                        
+                        for risk_level in ['low', 'moderate', 'high', 'extreme']:
+                            indices = [i for i, level in enumerate(risk_levels) if level == risk_level]
+                            if indices:
+                                fig.add_trace(
+                                    go.Scatter(
+                                        x=[timestamps[i] for i in indices],
+                                        y=[risk_scores[i] for i in indices],
+                                        mode='markers',
+                                        name=f'Risk: {risk_level}',
+                                        marker=dict(color=colors.get(risk_level, 'gray'), size=8)
+                                    ),
+                                    row=2, col=1
+                                )
+                        
+                        fig.update_xaxes(title_text="Date", row=2, col=1)
+                        fig.update_yaxes(title_text=f"{risk_type.replace('_', ' ').title()}", row=1, col=1)
+                        fig.update_yaxes(title_text="Risk Score", row=2, col=1)
+                        
+                        fig.update_layout(
+                            title=f"{risk_type.replace('_', ' ').title()} Risk Forecast ({horizon_days} days)",
+                            height=700,
+                            template='plotly_white',
+                            showlegend=True
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Risk summary
+                        st.subheader("📊 Risk Summary")
+                        risk_counts = {level: risk_levels.count(level) for level in ['low', 'moderate', 'high', 'extreme']}
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Low Risk Days", risk_counts.get('low', 0))
+                        with col2:
+                            st.metric("Moderate Risk Days", risk_counts.get('moderate', 0))
+                        with col3:
+                            st.metric("High Risk Days", risk_counts.get('high', 0))
+                        with col4:
+                            st.metric("Extreme Risk Days", risk_counts.get('extreme', 0))
+                        
+                    except APIError as e:
+                        st.error(f"Failed to generate forecast: {str(e)}")
+                        
+    except APIError as e:
+        st.error(f"Failed to load forecasts: {str(e)}")
+        st.info("💡 Temporal forecast data may not be available for this run.")

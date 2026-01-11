@@ -3,15 +3,18 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..models import RunSummary, RunDetail
 from ..storage import RunManifestStore
 from ...config.base_settings import settings
 from ...logging_utils import get_logger
+from ...analysis.timesfm_service import TimesFMService
+from ...analysis.temporal_extraction import load_temporal_series
+from ...analysis.era5_client import ERA5Client
 
 router = APIRouter()
 run_store = RunManifestStore(settings.data_dir, settings.processed_dir_name)
@@ -865,4 +868,202 @@ async def get_metrics_history(
     except Exception as e:
         logger.error(f"Error loading metrics history: {e}")
         raise HTTPException(status_code=500, detail=f"Error loading metrics history: {str(e)}")
+
+
+@router.get("/{run_id}/forecasts/energy-yield")
+async def get_energy_yield_forecast(
+    run_id: str,
+    horizon_days: int = Query(default=365, ge=30, le=3650, description="Forecast horizon in days"),
+    method: str = Query(default="auto", description="Forecasting method: 'auto', 'prophet', 'arima', 'simple_trend'"),
+    variable: str = Query(default="solar_radiation", description="Variable to forecast: 'solar_radiation' or 'wind_speed'"),
+) -> JSONResponse:
+    """
+    Generate energy yield forecast for a run.
+    
+    Forecasts renewable energy yield (solar or wind) based on historical weather data.
+    """
+    run = run_store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    run_dir = settings.data_dir / run_id / settings.processed_dir_name
+    temporal_dir = run_dir / "temporal"
+    
+    if not temporal_dir.exists():
+        raise HTTPException(status_code=404, detail="Temporal data not found for this run")
+    
+    # Load temporal series for the variable
+    if variable == "solar_radiation":
+        var_file = temporal_dir / "surface_solar_radiation_downwards_series.csv"
+        var_name = "surface_solar_radiation_downwards"
+    elif variable == "wind_speed":
+        # Calculate wind speed from u and v components
+        u_file = temporal_dir / "10m_u_component_of_wind_series.csv"
+        v_file = temporal_dir / "10m_v_component_of_wind_series.csv"
+        if not (u_file.exists() and v_file.exists()):
+            raise HTTPException(status_code=404, detail=f"Wind speed data not found")
+        
+        import pandas as pd
+        import numpy as np
+        
+        u_df = pd.read_csv(u_file)
+        v_df = pd.read_csv(v_file)
+        u_df["timestamp"] = pd.to_datetime(u_df["timestamp"])
+        v_df["timestamp"] = pd.to_datetime(v_df["timestamp"])
+        
+        wind_df = pd.DataFrame({
+            "timestamp": u_df["timestamp"],
+            "value": np.sqrt(u_df["value"]**2 + v_df["value"]**2),
+            "variable": "wind_speed",
+        })
+        
+        var_file = temporal_dir / "wind_speed_series.csv"
+        wind_df.to_csv(var_file, index=False)
+        var_name = "wind_speed"
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown variable: {variable}")
+    
+    if not var_file.exists():
+        raise HTTPException(status_code=404, detail=f"Temporal data for {variable} not found")
+    
+    try:
+        # Load temporal data
+        df = load_temporal_series(var_file, variable=var_name)
+        
+        # Initialize TimesFM service
+        timesfm_service = TimesFMService()
+        
+        # Generate forecast
+        forecast_result = timesfm_service.forecast_energy_yield(
+            historical_data=df,
+            horizon_days=horizon_days,
+            method=method,
+        )
+        
+        return JSONResponse(content=forecast_result)
+        
+    except Exception as e:
+        logger.error(f"Error generating energy yield forecast: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating forecast: {str(e)}")
+
+
+@router.get("/{run_id}/forecasts/climate-risk")
+async def get_climate_risk_forecast(
+    run_id: str,
+    risk_type: str = Query(default="extreme_heat", description="Type of climate risk"),
+    horizon_days: int = Query(default=365, ge=30, le=3650, description="Forecast horizon in days"),
+    method: str = Query(default="auto", description="Forecasting method"),
+) -> JSONResponse:
+    """
+    Generate climate risk forecast for a run.
+    
+    Forecasts climate risks (extreme heat, extreme cold, wind storms, drought) based on historical weather data.
+    """
+    run = run_store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    run_dir = settings.data_dir / run_id / settings.processed_dir_name
+    temporal_dir = run_dir / "temporal"
+    
+    if not temporal_dir.exists():
+        raise HTTPException(status_code=404, detail="Temporal data not found for this run")
+    
+    # Map risk types to variables
+    risk_to_variable = {
+        "extreme_heat": "2m_temperature",
+        "extreme_cold": "2m_temperature",
+        "wind_storm": "wind_speed",
+        "drought": "total_precipitation",
+    }
+    
+    if risk_type not in risk_to_variable:
+        raise HTTPException(status_code=400, detail=f"Unknown risk type: {risk_type}")
+    
+    variable = risk_to_variable[risk_type]
+    var_file = temporal_dir / f"{variable}_series.csv"
+    
+    if not var_file.exists():
+        raise HTTPException(status_code=404, detail=f"Temporal data for {variable} not found")
+    
+    try:
+        # Load temporal data
+        df = load_temporal_series(var_file, variable=variable)
+        
+        # Initialize TimesFM service
+        timesfm_service = TimesFMService()
+        
+        # Generate forecast
+        forecast_result = timesfm_service.forecast_climate_risk(
+            historical_data=df,
+            risk_type=risk_type,
+            horizon_days=horizon_days,
+            method=method,
+        )
+        
+        return JSONResponse(content=forecast_result)
+        
+    except Exception as e:
+        logger.error(f"Error generating climate risk forecast: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating forecast: {str(e)}")
+
+
+@router.get("/{run_id}/forecasts")
+async def list_forecasts(run_id: str) -> JSONResponse:
+    """
+    List all available forecasts for a run.
+    
+    Returns metadata about available temporal forecasts.
+    """
+    run = run_store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    run_dir = settings.data_dir / run_id / settings.processed_dir_name
+    temporal_dir = run_dir / "temporal"
+    
+    forecasts = []
+    
+    if temporal_dir.exists():
+        # Check for available temporal data
+        available_variables = []
+        for var_file in temporal_dir.glob("*_series.csv"):
+            var_name = var_file.stem.replace("_series", "")
+            available_variables.append(var_name)
+        
+        # Generate forecast metadata
+        for var in available_variables:
+            if "solar" in var.lower() or "radiation" in var.lower():
+                forecasts.append({
+                    "type": "energy_yield",
+                    "variable": "solar_radiation",
+                    "name": "Solar Energy Yield Forecast",
+                    "available": True,
+                })
+            elif "wind" in var.lower():
+                forecasts.append({
+                    "type": "energy_yield",
+                    "variable": "wind_speed",
+                    "name": "Wind Energy Yield Forecast",
+                    "available": True,
+                })
+            elif "temperature" in var.lower():
+                forecasts.append({
+                    "type": "climate_risk",
+                    "risk_type": "extreme_heat",
+                    "name": "Extreme Heat Risk Forecast",
+                    "available": True,
+                })
+                forecasts.append({
+                    "type": "climate_risk",
+                    "risk_type": "extreme_cold",
+                    "name": "Extreme Cold Risk Forecast",
+                    "available": True,
+                })
+    
+    return JSONResponse(content={
+        "run_id": run_id,
+        "forecasts": forecasts,
+        "count": len(forecasts),
+    })
 

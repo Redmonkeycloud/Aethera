@@ -38,6 +38,10 @@ class AppSettings(BaseSettings):
     groq_model: str = Field("llama-3.1-8b-instant", alias="GROQ_MODEL")
     llm_temperature: float = Field(0.3, alias="LLM_TEMPERATURE")
     use_llm: bool = Field(True, alias="USE_LLM")
+    
+    # ERA5/CDS API configuration
+    cds_api_key: str | None = Field(None, alias="CDS_API_KEY")
+    cds_api_url: str = Field("https://cds.climate.copernicus.eu/api/v2", alias="CDS_API_URL")
 
     def model_post_init(self, __context) -> None:
         """Resolve relative paths to absolute paths relative to project root."""

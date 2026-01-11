@@ -1,0 +1,158 @@
+{
+  "biodiversity": {
+    "xgboost": {
+      "best_params": {
+        "n_estimators": 443,
+        "max_depth": 5,
+        "learning_rate": 0.06626232879112792,
+        "subsample": 0.6359868384873585,
+        "colsample_bytree": 0.9540821555984345,
+        "min_child_weight": 4,
+        "gamma": 0.3380411638303995,
+        "reg_alpha": 0.06193262237937095,
+        "reg_lambda": 0.4511611942605322,
+        "objective": "multi:softprob",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "best_score": 0.6030642861903343
+    },
+    "lightgbm": {
+      "best_params": {
+        "n_estimators": 374,
+        "max_depth": 3,
+        "learning_rate": 0.03784839815277684,
+        "subsample": 0.6426566951628486,
+        "colsample_bytree": 0.7150035229768533,
+        "min_child_samples": 50,
+        "num_leaves": 214,
+        "reg_alpha": 0.09376993382387529,
+        "reg_lambda": 0.07434696078839223,
+        "objective": "multiclass",
+        "metric": "multi_logloss",
+        "boosting_type": "gbdt",
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "best_score": 0.6175395681873398
+    }
+  },
+  "resm": {
+    "xgboost": {
+      "best_params": {
+        "n_estimators": 433,
+        "max_depth": 3,
+        "learning_rate": 0.09409215006884902,
+        "subsample": 0.7801999088482754,
+        "colsample_bytree": 0.6422320760802817,
+        "min_child_weight": 2,
+        "gamma": 0.07581538489762502,
+        "reg_alpha": 0.33561617817672207,
+        "reg_lambda": 0.9617250299365016,
+        "objective": "reg:squarederror",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "best_score": 0.9833858582851608
+    },
+    "lightgbm": {
+      "best_params": {
+        "n_estimators": 492,
+        "max_depth": 3,
+        "learning_rate": 0.08818217255718726,
+        "subsample": 0.9886908704755141,
+        "colsample_bytree": 0.7772208455450033,
+        "min_child_samples": 76,
+        "num_leaves": 68,
+        "reg_alpha": 0.20441364789321115,
+        "reg_lambda": 0.530023403714875,
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "best_score": 0.9833269964512896
+    }
+  },
+  "ahsm": {
+    "xgboost": {
+      "best_params": {
+        "n_estimators": 223,
+        "max_depth": 6,
+        "learning_rate": 0.15337612144383647,
+        "subsample": 0.8540122038144633,
+        "colsample_bytree": 0.9909223380913255,
+        "min_child_weight": 1,
+        "gamma": 0.2504417148269022,
+        "reg_alpha": 0.6671303719231596,
+        "reg_lambda": 0.1843300195806398,
+        "objective": "multi:softprob",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "best_score": 0.7101791316671482
+    },
+    "lightgbm": {
+      "best_params": {
+        "n_estimators": 241,
+        "max_depth": 3,
+        "learning_rate": 0.23637668804974665,
+        "subsample": 0.6213071107914185,
+        "colsample_bytree": 0.9744498382841009,
+        "min_child_samples": 68,
+        "num_leaves": 159,
+        "reg_alpha": 0.05947711139474474,
+        "reg_lambda": 0.12545097213855547,
+        "objective": "multiclass",
+        "metric": "multi_logloss",
+        "boosting_type": "gbdt",
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "best_score": 0.7342129759787019
+    }
+  },
+  "cim": {
+    "xgboost": {
+      "best_params": {
+        "n_estimators": 165,
+        "max_depth": 3,
+        "learning_rate": 0.0993215673572416,
+        "subsample": 0.8421796297245014,
+        "colsample_bytree": 0.9789531849690856,
+        "min_child_weight": 3,
+        "gamma": 0.35841200784584765,
+        "reg_alpha": 0.28824004033415374,
+        "reg_lambda": 0.0597523046750142,
+        "objective": "multi:softprob",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "best_score": 0.8029903026211749
+    },
+    "lightgbm": {
+      "best_params": {
+        "n_estimators": 354,
+        "max_depth": 6,
+        "learning_rate": 0.045074586648743274,
+        "subsample": 0.7749871884725007,
+        "colsample_bytree": 0.9992227110769342,
+        "min_child_samples": 16,
+        "num_leaves": 74,
+        "reg_alpha": 0.4221964523418568,
+        "reg_lambda": 0.17515211532068853,
+        "objective": "multiclass",
+        "metric": "multi_logloss",
+        "boosting_type": "gbdt",
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "best_score": 0.8076519904975414
+    }
+  }
+}

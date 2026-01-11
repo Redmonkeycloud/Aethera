@@ -288,6 +288,27 @@ def main() -> None:
     wind_raster_path = catalog.weather_wind_speed(height=100)
     weather_summary_path = catalog.weather_summary()
     
+    # Extract temporal data for forecasting
+    logger.info("Extracting temporal weather data for forecasting...")
+    try:
+        from .analysis.temporal_extraction import extract_temporal_data_for_aoi
+        from .analysis.era5_client import ERA5Client
+        
+        era5_client = ERA5Client()
+        temporal_data_paths = extract_temporal_data_for_aoi(
+            aoi=aoi,
+            run_dir=run_dir,
+            era5_client=era5_client,
+            years_back=5,
+        )
+        
+        if temporal_data_paths:
+            logger.info(f"Extracted temporal data: {list(temporal_data_paths.keys())}")
+        else:
+            logger.warning("No temporal data extracted (ERA5 client may not be configured)")
+    except Exception as e:
+        logger.warning(f"Failed to extract temporal data: {e}")
+    
     resm_features = build_resm_features(
         aoi=aoi,
         land_cover_summary=land_cover_summary,

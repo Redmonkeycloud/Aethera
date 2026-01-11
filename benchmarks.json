@@ -1,0 +1,198 @@
+{
+  "biodiversity": {
+    "n_models": 5,
+    "results": [
+      {
+        "model_name": "Logistic Regression",
+        "accuracy": 0.935,
+        "training_time": 0.008897542953491211,
+        "inference_time": 1.208782196044922e-06,
+        "cv_mean": 0.9025000000000001,
+        "cv_std": 0.004999999999999982
+      },
+      {
+        "model_name": "Random Forest",
+        "accuracy": 0.91,
+        "training_time": 0.22941231727600098,
+        "inference_time": 5.695343017578125e-05,
+        "cv_mean": 0.88375,
+        "cv_std": 0.01704772712123231
+      },
+      {
+        "model_name": "Gradient Boosting",
+        "accuracy": 0.92,
+        "training_time": 0.49670886993408203,
+        "inference_time": 5.075931549072265e-06,
+        "cv_mean": 0.8850000000000001,
+        "cv_std": 0.02113941815660971
+      },
+      {
+        "model_name": "XGBoost",
+        "accuracy": 0.93,
+        "training_time": 0.5234017372131348,
+        "inference_time": 8.634328842163087e-06,
+        "cv_mean": 0.89625,
+        "cv_std": 0.015103807466993201
+      },
+      {
+        "model_name": "LightGBM",
+        "accuracy": 0.945,
+        "training_time": 0.4168376922607422,
+        "inference_time": 1.952528953552246e-05,
+        "cv_mean": 0.9,
+        "cv_std": 0.016298006013006607
+      }
+    ],
+    "best_accuracy": "LightGBM",
+    "fastest_training": "Logistic Regression",
+    "fastest_inference": "Logistic Regression",
+    "best_cv": "Logistic Regression"
+  },
+  "resm": {
+    "n_models": 5,
+    "results": [
+      {
+        "model_name": "Ridge Regression",
+        "accuracy": 0.9972009834701742,
+        "training_time": 0.011714458465576172,
+        "inference_time": 2.2029876708984376e-06,
+        "cv_mean": 0.9981819249964883,
+        "cv_std": 0.0014585577571395558
+      },
+      {
+        "model_name": "Random Forest",
+        "accuracy": 0.8932017131185133,
+        "training_time": 0.6705598831176758,
+        "inference_time": 7.599830627441406e-05,
+        "cv_mean": 0.8962256397060896,
+        "cv_std": 0.01562686803566203
+      },
+      {
+        "model_name": "Gradient Boosting",
+        "accuracy": 0.9512097478511891,
+        "training_time": 0.5776736736297607,
+        "inference_time": 3.4427642822265624e-06,
+        "cv_mean": 0.9446867875480681,
+        "cv_std": 0.007219441117611976
+      },
+      {
+        "model_name": "XGBoost",
+        "accuracy": 0.9339997584544033,
+        "training_time": 0.16436290740966797,
+        "inference_time": 4.476308822631836e-06,
+        "cv_mean": 0.9254274759091136,
+        "cv_std": 0.009987542516116978
+      },
+      {
+        "model_name": "LightGBM",
+        "accuracy": 0.9646764408163226,
+        "training_time": 0.0928044319152832,
+        "inference_time": 7.346868515014649e-06,
+        "cv_mean": 0.9580598182279854,
+        "cv_std": 0.008007334186012188
+      }
+    ],
+    "best_accuracy": "Ridge Regression",
+    "fastest_training": "Ridge Regression",
+    "fastest_inference": "Ridge Regression",
+    "best_cv": "Ridge Regression"
+  },
+  "ahsm": {
+    "n_models": 5,
+    "results": [
+      {
+        "model_name": "Logistic Regression",
+        "accuracy": 0.79,
+        "training_time": 0.019574880599975586,
+        "inference_time": 2.1469593048095705e-06,
+        "cv_mean": 0.8212499999999998,
+        "cv_std": 0.012247448713915877
+      },
+      {
+        "model_name": "Random Forest",
+        "accuracy": 0.755,
+        "training_time": 0.3340942859649658,
+        "inference_time": 6.198406219482422e-05,
+        "cv_mean": 0.81375,
+        "cv_std": 0.019121323175972944
+      },
+      {
+        "model_name": "Gradient Boosting",
+        "accuracy": 0.77,
+        "training_time": 3.293919801712036,
+        "inference_time": 1.568317413330078e-05,
+        "cv_mean": 0.7950000000000002,
+        "cv_std": 0.023518609652783476
+      },
+      {
+        "model_name": "XGBoost",
+        "accuracy": 0.78,
+        "training_time": 0.4739682674407959,
+        "inference_time": 8.363723754882812e-06,
+        "cv_mean": 0.835,
+        "cv_std": 0.02038688303787512
+      },
+      {
+        "model_name": "LightGBM",
+        "accuracy": 0.785,
+        "training_time": 0.39049720764160156,
+        "inference_time": 1.4233589172363282e-05,
+        "cv_mean": 0.84375,
+        "cv_std": 0.014252192813739233
+      }
+    ],
+    "best_accuracy": "Logistic Regression",
+    "fastest_training": "Logistic Regression",
+    "fastest_inference": "Logistic Regression",
+    "best_cv": "LightGBM"
+  },
+  "cim": {
+    "n_models": 5,
+    "results": [
+      {
+        "model_name": "Logistic Regression",
+        "accuracy": 0.97,
+        "training_time": 0.014462709426879883,
+        "inference_time": 2.2411346435546876e-06,
+        "cv_mean": 0.95,
+        "cv_std": 0.009682458365518551
+      },
+      {
+        "model_name": "Random Forest",
+        "accuracy": 0.86,
+        "training_time": 0.330981969833374,
+        "inference_time": 6.328821182250976e-05,
+        "cv_mean": 0.8200000000000001,
+        "cv_std": 0.015512092057488595
+      },
+      {
+        "model_name": "Gradient Boosting",
+        "accuracy": 0.9,
+        "training_time": 2.9065568447113037,
+        "inference_time": 1.3788938522338867e-05,
+        "cv_mean": 0.865,
+        "cv_std": 0.028668362352949294
+      },
+      {
+        "model_name": "XGBoost",
+        "accuracy": 0.915,
+        "training_time": 0.3611617088317871,
+        "inference_time": 7.730722427368163e-06,
+        "cv_mean": 0.8725000000000002,
+        "cv_std": 0.018791620472966133
+      },
+      {
+        "model_name": "LightGBM",
+        "accuracy": 0.92,
+        "training_time": 0.3649637699127197,
+        "inference_time": 1.3306140899658204e-05,
+        "cv_mean": 0.8762500000000001,
+        "cv_std": 0.0214330352493528
+      }
+    ],
+    "best_accuracy": "Logistic Regression",
+    "fastest_training": "Logistic Regression",
+    "fastest_inference": "Logistic Regression",
+    "best_cv": "Logistic Regression"
+  }
+}

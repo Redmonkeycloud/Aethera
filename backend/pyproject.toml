@@ -56,7 +56,10 @@ dependencies = [
     "langchain-openai>=0.0.5",
     "xgboost>=2.0.0",
     "lightgbm>=4.0.0",
-    "optuna>=3.5.0"
+    "optuna>=3.5.0",
+    "cdsapi>=0.7.0",
+    "prophet>=1.1.5",
+    "statsmodels>=0.14.0"
 ]
 
 [project.optional-dependencies]
