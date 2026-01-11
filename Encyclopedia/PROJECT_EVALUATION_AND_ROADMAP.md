@@ -101,7 +101,7 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 **Opportunities:**
 - ❌ XGBoost/LightGBM mentioned in configs but not implemented
 - ❌ No deep learning options
-- ❌ No time-series models
+- ❌ No time-series models (TimesFM integration planned)
 - ❌ No transfer learning
 - ❌ Limited hyperparameter optimization
 
@@ -211,6 +211,24 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 - **Next Steps**:
   - Complete Global Wind Atlas integration
   - Add temperature/precipitation data (ERA5/Copernicus CDS)
+  - Integrate historical time-series data for temporal forecasting
+
+#### ✅ Documentation Consolidation
+- **Status**: ✅ COMPLETE (2025-01-05)
+- **Implementation**: All `.md` files consolidated to `Encyclopedia/` folder (except `Quick Start Services Guide.md`)
+- **Benefits**:
+  - Centralized documentation location
+  - Easier navigation and maintenance
+  - Cleaner project structure
+  - Single source of truth for project documentation
+
+#### ✅ Validation Report Improvements
+- **Status**: ✅ COMPLETE (2025-01-05)
+- **Implementation**: Updated `scripts/validate_training_data.py`
+- **Features**:
+  - RESM regression models now show summary statistics (Range, Mean, Std, Percentiles) instead of listing all unique values
+  - Classification models (AHSM, CIM, Biodiversity) show balanced class distributions
+  - Improved readability and performance of validation reports
 
 ---
 
@@ -230,8 +248,28 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
   - Benchmark performance
   
 - **Add New Model Types:**
+  - **Time-series models** (Priority: **TimesFM** - Google's foundation model for forecasting) 🆕
+    - **Objective**: Add dynamic performance forecasting capabilities
+    - **Use Cases**:
+      - Energy yield prediction (RESM): Forecast daily/monthly solar/wind production over 10 years
+      - Climate risk projection (AHSM): Predict future hazard trends (flood risks, temperature anomalies)
+      - Carbon sequestration forecasting: Predict how site's carbon balance will evolve over time
+    - **Implementation Steps**:
+      1. Identify time-series data sources (ERA5 historical weather data)
+      2. Create `TimeSfmService` in backend
+      3. Build temporal feature extraction pipeline
+      4. Integrate TimesFM for zero-shot forecasting (no retraining needed)
+      5. Add "Temporal Forecast" tab to Run page with future trend visualizations
+      6. Use LangChain to generate narrative explanations of forecasts
+    - **Requirements**:
+      - Historical weather sequences (hourly wind speed, daily temperature, monthly precipitation)
+      - ERA5/Copernicus CDS data integration
+      - Temporal alignment of historical data with AOI coordinates
+    - **Expected Benefits**:
+      - Move from static "suitability scores" to dynamic "future outlook"
+      - Enable long-term ROI projections for renewable energy projects
+      - Proactive climate risk assessment
   - **Neural Networks** (PyTorch/TensorFlow) for complex pattern recognition
-  - **Time-series models** (LSTM, Transformer) for temporal analysis
   - **Graph Neural Networks** for spatial relationship modeling
   
 - **Per-Task Model Optimization:**
@@ -649,12 +687,45 @@ AETHERA 2.0 is an AI-assisted Environmental Impact Assessment (EIA) platform wit
 
 ## 📊 Recommended Implementation Timeline
 
-### **Q1 2025 (Next 3 months)**
-- ✅ Metrics enhancement (F1, Recall, MSE, RMSE visualization)
-- ✅ XGBoost/LightGBM implementation
-- ✅ Additional data source integration (2-3 datasets)
-- ✅ Frontend improvements (real-time updates, better visualizations)
-- ✅ Basic security (authentication, API keys)
+### **Q1 2025 (Next 3 months) - IMMEDIATE NEXT STEPS**
+
+#### **Week 1-2: TimesFM Integration (HIGHEST PRIORITY)**
+1. **Historical Weather Data Integration**
+   - Download ERA5 historical data for target regions
+   - Set up Copernicus CDS API integration
+   - Create temporal data storage schema
+   - Build data extraction pipeline for AOI coordinates
+
+2. **TimesFM Service Implementation**
+   - Create `backend/src/analysis/timesfm_service.py`
+   - Integrate TimesFM library (zero-shot forecasting)
+   - Build temporal feature extraction from ERA5 sequences
+   - Implement forecast generation for RESM (energy yield)
+
+3. **Frontend Integration**
+   - Add "Temporal Forecast" tab to Run page
+   - Visualize future energy yield trends (line charts)
+   - Display climate risk projections (risk over time)
+   - Integrate LangChain for narrative explanations
+
+#### **Week 3-4: Metrics Enhancement**
+- Add F1 score prominently in UI (classification models)
+- Visualize confusion matrices in frontend (Yellowbrick plots)
+- Display ROC curves and PR curves
+- Add metrics dashboards per model in "Model Explainability" tab
+- Historical metric tracking (database schema)
+
+#### **Week 5-6: XGBoost/LightGBM Implementation**
+- Replace placeholder implementations with actual models
+- Benchmark performance vs. current ensembles
+- Optimize hyperparameters with Optuna
+- Add to model selection pipeline
+
+#### **Week 7-12: Additional Enhancements**
+- Complete Global Wind Atlas integration
+- Additional data source integration (2-3 more datasets)
+- Frontend improvements (real-time updates, better visualizations)
+- Basic security (authentication, API keys)
 
 ### **Q2 2025 (Months 4-6)**
 - ✅ New model types (Neural Networks, time-series)
@@ -747,6 +818,13 @@ AETHERA 2.0 demonstrates a **strong foundation** with comprehensive functionalit
 2. ✅ Clear path for enhancements in metrics, models, data, and UX
 3. ✅ Security and observability are next critical priorities
 4. ✅ Long-term vision includes advanced AI and collaboration features
+5. ✅ **TimesFM integration** offers exciting opportunity for temporal forecasting capabilities
+
+**Immediate Next Steps (2025-01-05):**
+1. **Integrate TimesFM** for dynamic performance forecasting (energy yield, climate risks)
+2. **Enhance metrics visualization** (F1 scores, confusion matrices, ROC curves)
+3. **Implement XGBoost/LightGBM** as robust ensemble alternatives
+4. **Complete weather data integration** (Wind Atlas, ERA5 historical data)
 
 The recommended timeline prioritizes user-requested improvements while building towards a robust, scalable, and secure platform. With focused effort on the Priority 1 items, AETHERA 2.0 will be well-positioned for production deployment and user adoption.
 

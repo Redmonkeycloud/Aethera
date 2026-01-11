@@ -165,6 +165,18 @@ def generate_shap_explanations(
         
         if any(tree_name in model_name for tree_name in tree_models):
             try:
+                # GradientBoostingClassifier only supports binary classification in TreeExplainer
+                if "GradientBoosting" in model_name and model_type == "classification":
+                    # Check if it's multi-class by looking at the model
+                    try:
+                        n_classes = len(actual_model.classes_) if hasattr(actual_model, 'classes_') else 2
+                        if n_classes > 2:
+                            # Skip TreeExplainer for multi-class GradientBoostingClassifier
+                            logger.warning(f"TreeExplainer not supported for multi-class {model_name}, skipping...")
+                            raise ValueError("Multi-class GradientBoostingClassifier not supported by TreeExplainer")
+                    except Exception:
+                        pass
+                
                 explainer = shap.TreeExplainer(actual_model)
                 shap_values = explainer.shap_values(X_sample)
                 # For classification, SHAP returns list of arrays (one per class)
@@ -221,10 +233,34 @@ def generate_shap_explanations(
                 importance_dict[f"feature_{idx}"] = float(importance)
         
         # Get summary statistics
+        try:
+            if len(shap_values.shape) > 1:
+                shap_mean = shap_values.mean(axis=0)
+                shap_std = shap_values.std(axis=0)
+                # Convert to list, handling arrays properly
+                if isinstance(shap_mean, np.ndarray):
+                    shap_mean = shap_mean.tolist()
+                else:
+                    shap_mean = [float(shap_mean)]
+                if isinstance(shap_std, np.ndarray):
+                    shap_std = shap_std.tolist()
+                else:
+                    shap_std = [float(shap_std)]
+            else:
+                # Single dimension - convert to list
+                mean_val = float(shap_values.mean())
+                std_val = float(shap_values.std())
+                shap_mean = [mean_val]
+                shap_std = [std_val]
+        except Exception as e:
+            logger.warning(f"Error calculating SHAP statistics: {e}")
+            shap_mean = []
+            shap_std = []
+        
         result = {
             "feature_importance": importance_dict,
-            "shap_values_mean": shap_values.mean(axis=0).tolist() if len(shap_values.shape) > 1 else shap_values.mean().tolist(),
-            "shap_values_std": shap_values.std(axis=0).tolist() if len(shap_values.shape) > 1 else shap_values.std().tolist(),
+            "shap_values_mean": shap_mean,
+            "shap_values_std": shap_std,
             "model_type": model_type,
             "explainer_type": type(explainer).__name__,
         }

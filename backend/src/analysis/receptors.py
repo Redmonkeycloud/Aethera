@@ -7,6 +7,7 @@ from pathlib import Path
 
 import geopandas as gpd
 from shapely.geometry import Point
+from shapely.ops import nearest_points
 
 from ..logging_utils import get_logger
 
@@ -148,22 +149,40 @@ def _find_nearest_receptor(
     id_field: str = "ID",
 ) -> ReceptorDistance | None:
     """Find the nearest receptor to a point."""
-    # Ensure same CRS
-    if receptors.crs != "EPSG:4326":
-        receptors = receptors.to_crs("EPSG:4326")
+    # Project to a projected CRS for accurate distance calculations
+    if receptors.crs and receptors.crs.is_geographic:
+        receptors_proj = receptors.to_crs("EPSG:3857")  # Web Mercator
+        point_proj = Point(point.x, point.y)
+        point_gdf = gpd.GeoDataFrame(geometry=[point_proj], crs="EPSG:4326")
+        point_gdf_proj = point_gdf.to_crs("EPSG:3857")
+        point_proj_geom = point_gdf_proj.geometry.iloc[0]
+    else:
+        receptors_proj = receptors
+        point_proj_geom = point
 
-    # Calculate distances
-    distances = receptors.geometry.distance(point)
+    # Calculate distances in projected CRS
+    distances = receptors_proj.geometry.distance(point_proj_geom)
     min_idx = distances.idxmin()
     min_distance_m = distances.loc[min_idx]
 
     if min_distance_m > max_distance_km * 1000:
         return None
 
-    receptor = receptors.loc[min_idx]
-    nearest_point = receptor.geometry.interpolate(
-        receptor.geometry.project(point)
-    )
+    receptor = receptors_proj.loc[min_idx]
+    
+    # Find nearest point on geometry (works for any geometry type)
+    try:
+        # Use shapely's nearest_points to find the nearest point on the geometry
+        nearest_geom = nearest_points(point_proj_geom, receptor.geometry)[1]
+        # Convert back to EPSG:4326 if needed
+        if receptors.crs and receptors.crs.is_geographic:
+            nearest_gdf = gpd.GeoDataFrame(geometry=[nearest_geom], crs="EPSG:3857")
+            nearest_point = nearest_gdf.to_crs("EPSG:4326").geometry.iloc[0]
+        else:
+            nearest_point = nearest_geom
+    except Exception:
+        # Fallback: use point itself if nearest_points fails
+        nearest_point = point
 
     return ReceptorDistance(
         receptor_type=receptor_type,
@@ -184,19 +203,38 @@ def _find_all_receptors(
     id_field: str = "ID",
 ) -> list[ReceptorDistance]:
     """Find all receptors within max distance."""
-    if receptors.crs != "EPSG:4326":
-        receptors = receptors.to_crs("EPSG:4326")
+    # Project to a projected CRS for accurate distance calculations
+    if receptors.crs and receptors.crs.is_geographic:
+        receptors_proj = receptors.to_crs("EPSG:3857")  # Web Mercator
+        point_proj = Point(point.x, point.y)
+        point_gdf = gpd.GeoDataFrame(geometry=[point_proj], crs="EPSG:4326")
+        point_gdf_proj = point_gdf.to_crs("EPSG:3857")
+        point_proj_geom = point_gdf_proj.geometry.iloc[0]
+    else:
+        receptors_proj = receptors
+        point_proj_geom = point
 
     max_distance_m = max_distance_km * 1000
-    distances = receptors.geometry.distance(point)
-    within_range = receptors[distances <= max_distance_m]
+    distances = receptors_proj.geometry.distance(point_proj_geom)
+    within_range_idx = distances <= max_distance_m
+    within_range = receptors_proj[within_range_idx]
 
     results = []
+    
     for idx, receptor in within_range.iterrows():
         distance_m = distances.loc[idx]
-        nearest_point = receptor.geometry.interpolate(
-            receptor.geometry.project(point)
-        )
+        # Find nearest point on geometry (works for any geometry type)
+        try:
+            nearest_geom = nearest_points(point_proj_geom, receptor.geometry)[1]
+            # Convert back to EPSG:4326 if needed
+            if receptors.crs and receptors.crs.is_geographic:
+                nearest_gdf = gpd.GeoDataFrame(geometry=[nearest_geom], crs="EPSG:3857")
+                nearest_point = nearest_gdf.to_crs("EPSG:4326").geometry.iloc[0]
+            else:
+                nearest_point = nearest_geom
+        except Exception:
+            # Fallback: use point itself if nearest_points fails
+            nearest_point = point
 
         results.append(
             ReceptorDistance(
