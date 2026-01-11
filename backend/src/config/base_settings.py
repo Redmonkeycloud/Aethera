@@ -40,8 +40,10 @@ class AppSettings(BaseSettings):
     use_llm: bool = Field(True, alias="USE_LLM")
     
     # ERA5/CDS API configuration
+    # Note: Recommended setup is to use ~/.cdsapirc file (see https://cds.climate.copernicus.eu/how-to-api)
+    # These environment variables are fallback options
     cds_api_key: str | None = Field(None, alias="CDS_API_KEY")
-    cds_api_url: str = Field("https://cds.climate.copernicus.eu/api/v2", alias="CDS_API_URL")
+    cds_api_url: str = Field("https://cds.climate.copernicus.eu/api", alias="CDS_API_URL")
 
     def model_post_init(self, __context) -> None:
         """Resolve relative paths to absolute paths relative to project root."""

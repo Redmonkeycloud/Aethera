@@ -26,34 +26,68 @@ except ImportError:
 
 
 class ERA5Client:
-    """Client for downloading ERA5 reanalysis data from Copernicus CDS."""
+    """
+    Client for downloading ERA5 reanalysis data from Copernicus CDS.
+    
+    Follows the official CDS API setup guide:
+    https://cds.climate.copernicus.eu/how-to-api
+    
+    Recommended setup:
+    1. Register at https://cds.climate.copernicus.eu/
+    2. Create ~/.cdsapirc file with:
+       url: https://cds.climate.copernicus.eu/api
+       key: <YOUR-PERSONAL-ACCESS-TOKEN>
+    3. Install: pip install "cdsapi>=0.7.7"
+    
+    Alternative: Set CDS_API_KEY environment variable (falls back to this if .cdsapirc not found)
+    """
 
     def __init__(self, cds_api_key: Optional[str] = None, cds_api_url: Optional[str] = None) -> None:
         """
         Initialize ERA5 client.
 
         Args:
-            cds_api_key: Copernicus CDS API key (or set CDS_API_KEY env var)
-            cds_api_url: Copernicus CDS API URL (or set CDS_API_URL env var)
+            cds_api_key: Optional Copernicus CDS API key (prefer .cdsapirc file)
+            cds_api_url: Optional Copernicus CDS API URL (default: https://cds.climate.copernicus.eu/api)
         """
         if not CDSAPI_AVAILABLE:
-            logger.warning("cdsapi not installed. Install with: pip install cdsapi")
-            self.client = None
-            return
-
-        api_key = cds_api_key or os.getenv("CDS_API_KEY")
-        api_url = cds_api_url or os.getenv("CDS_API_URL", "https://cds.climate.copernicus.eu/api/v2")
-
-        if not api_key:
-            logger.warning("CDS_API_KEY not set. ERA5 downloads will be disabled.")
+            logger.warning("cdsapi not installed. Install with: pip install 'cdsapi>=0.7.7'")
             self.client = None
             return
 
         try:
+            # Prefer standard .cdsapirc file (recommended by CDS documentation)
+            # If no explicit key/url provided, try default Client() initialization
+            if cds_api_key is None and cds_api_url is None:
+                try:
+                    self.client = cdsapi.Client()
+                    logger.info("ERA5 client initialized from .cdsapirc file")
+                    return
+                except Exception as e:
+                    logger.debug(f"Failed to initialize from .cdsapirc: {e}")
+                    # Fall back to environment variables or explicit parameters
+            
+            # Fallback: use environment variables or explicit parameters
+            api_key = cds_api_key or os.getenv("CDS_API_KEY")
+            api_url = cds_api_url or os.getenv("CDS_API_URL", "https://cds.climate.copernicus.eu/api")
+
+            if not api_key:
+                logger.warning(
+                    "CDS API key not found. Please either:\n"
+                    "1. Create ~/.cdsapirc file (recommended):\n"
+                    "   url: https://cds.climate.copernicus.eu/api\n"
+                    "   key: <YOUR-PERSONAL-ACCESS-TOKEN>\n"
+                    "2. Set CDS_API_KEY environment variable\n"
+                    "See: https://cds.climate.copernicus.eu/how-to-api"
+                )
+                self.client = None
+                return
+
             self.client = cdsapi.Client(url=api_url, key=api_key)
             logger.info("ERA5 client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize ERA5 client: {e}")
+            logger.info("See setup guide: https://cds.climate.copernicus.eu/how-to-api")
             self.client = None
 
     def download_hourly_data(
